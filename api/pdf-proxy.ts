@@ -5,13 +5,21 @@ export const config = {
 function normalizeUrl(rawUrl: string): string {
   let decoded = rawUrl;
   try {
-    while (decoded.includes('%20') || decoded.includes('%25')) {
+    while (
+      decoded.includes('%20') ||
+      decoded.includes('%25') ||
+      decoded.includes('%28') ||
+      decoded.includes('%29')
+    ) {
       const prev = decoded;
       decoded = decodeURIComponent(decoded);
       if (decoded === prev) break;
     }
   } catch {}
-  return encodeURI(decoded);
+
+  return encodeURI(decoded)
+    .replace(/\(/g, '%28')
+    .replace(/\)/g, '%29');
 }
 
 export default async function handler(request: Request) {

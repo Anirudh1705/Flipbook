@@ -3,10 +3,30 @@
  * Automatically resolves webpage / repository / cloud links into direct streaming PDF URLs
  * and routes non-CORS hosts (like Archive.org) through the built-in streaming proxy.
  */
+function cleanArchiveFilename(name: string): string {
+  let decoded = name;
+  try {
+    while (
+      decoded.includes('%20') ||
+      decoded.includes('%25') ||
+      decoded.includes('%28') ||
+      decoded.includes('%29')
+    ) {
+      const prev = decoded;
+      decoded = decodeURIComponent(decoded);
+      if (decoded === prev) break;
+    }
+  } catch {}
+
+  return encodeURI(decoded)
+    .replace(/\(/g, '%28')
+    .replace(/\)/g, '%29');
+}
+
 export async function resolveDirectPdfUrl(rawUrl: string): Promise<string> {
   let url = rawUrl.trim();
 
-  // Strip existing proxy wrappers to avoid double-proxying
+  // Strip existing proxy wrappers to avoid duplicate proxying
   while (url.includes('api/pdf-proxy?url=')) {
     const parts = url.split(/api\/pdf-proxy\?url=/);
     url = decodeURIComponent(parts[parts.length - 1]);
@@ -27,7 +47,8 @@ export async function resolveDirectPdfUrl(rawUrl: string): Promise<string> {
         if (pdfFile && pdfFile.name) {
           const server = meta.server || meta.d1 || meta.workable_servers?.[0] || 'ia601801.us.archive.org';
           const dir = meta.dir || `/items/${identifier}`;
-          const directStorageUrl = `https://${server}${dir}/${encodeURI(decodeURI(pdfFile.name))}`;
+          const encodedFilename = cleanArchiveFilename(pdfFile.name);
+          const directStorageUrl = `https://${server}${dir}/${encodedFilename}`;
           return `/api/pdf-proxy?url=${encodeURIComponent(directStorageUrl)}`;
         }
       }
@@ -37,8 +58,8 @@ export async function resolveDirectPdfUrl(rawUrl: string): Promise<string> {
   }
 
   // 2. Direct Archive.org download link: https://archive.org/download/... or storage node link
-  if (url.includes('archive.org/download/') || url.includes('.archive.org/items/')) {
-    const cleanUrl = encodeURI(decodeURI(url));
+  if (url.includes('archive.org/download/') || url.includes('.archive.org/')) {
+    const cleanUrl = cleanArchiveFilename(url);
     return `/api/pdf-proxy?url=${encodeURIComponent(cleanUrl)}`;
   }
 
