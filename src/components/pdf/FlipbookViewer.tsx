@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { Book } from '../../types/book';
-import { TurnFlipbook, type TurnFlipbookHandle } from './TurnFlipbook';
+import { RealisticPageFlip, type RealisticPageFlipHandle } from './RealisticPageFlip';
 import { PdfToolbar } from './PdfToolbar';
 import { PdfThumbnails } from './PdfThumbnails';
 import { PdfSearchModal } from './PdfSearchModal';
@@ -14,11 +14,12 @@ interface FlipbookViewerProps {
 
 export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocument }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const turnFlipbookRef = useRef<TurnFlipbookHandle | null>(null);
+  const pageFlipRef = useRef<RealisticPageFlipHandle | null>(null);
   const totalPages = pdfDocument.numPages;
 
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [scale, setScale] = useState<number>(1.0);
+  const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [scale, setScale] = useState<number>(0.9);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showThumbnails, setShowThumbnails] = useState<boolean>(false);
   const [showSearch, setShowSearch] = useState<boolean>(false);
@@ -29,19 +30,52 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
 
   const search = usePdfSearch(pdfDocument);
 
+  // Responsive mobile and auto-scale calculations
+  const calculateFitScale = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || baseDimensions.width === 0 || baseDimensions.height === 0) return;
+
+    const isMobileView = window.innerWidth < 768;
+    setIsMobile(isMobileView);
+
+    const availWidth = Math.max(280, container.clientWidth - (isMobileView ? 24 : 64));
+    const availHeight = Math.max(300, container.clientHeight - (isMobileView ? 110 : 140));
+
+    if (isMobileView) {
+      const fitW = availWidth / baseDimensions.width;
+      const fitH = availHeight / baseDimensions.height;
+      const optimal = Math.min(fitW, fitH, 1.1);
+      setScale(Math.max(0.35, Number(optimal.toFixed(2))));
+    } else {
+      // 2-page spread on desktop
+      const fitW = availWidth / (baseDimensions.width * 2);
+      const fitH = availHeight / baseDimensions.height;
+      const optimal = Math.min(fitW, fitH, 1.3);
+      setScale(Math.max(0.4, Number(optimal.toFixed(2))));
+    }
+  }, [baseDimensions]);
+
+  useEffect(() => {
+    calculateFitScale();
+    const handleResize = () => {
+      calculateFitScale();
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [calculateFitScale]);
+
   // Page Navigation Handlers
   const handleGoToPage = (page: number) => {
     const clamped = Math.max(1, Math.min(page, totalPages));
-    setCurrentPage(clamped);
-    turnFlipbookRef.current?.flipToPage(clamped);
+    pageFlipRef.current?.flipToPage(clamped);
   };
 
   const handleNextPage = useCallback(() => {
-    turnFlipbookRef.current?.flipNext();
+    pageFlipRef.current?.flipNext();
   }, []);
 
   const handlePrevPage = useCallback(() => {
-    turnFlipbookRef.current?.flipPrev();
+    pageFlipRef.current?.flipPrev();
   }, []);
 
   const handleFirstPage = () => handleGoToPage(1);
@@ -49,9 +83,9 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
 
   // Zoom Handlers
   const handleZoomIn = () => setScale(s => Math.min(Number((s + 0.15).toFixed(2)), 2.0));
-  const handleZoomOut = () => setScale(s => Math.max(Number((s - 0.15).toFixed(2)), 0.6));
-  const handleFitPage = () => setScale(1.0);
-  const handleFitWidth = () => setScale(1.2);
+  const handleZoomOut = () => setScale(s => Math.max(Number((s - 0.15).toFixed(2)), 0.4));
+  const handleFitPage = () => calculateFitScale();
+  const handleFitWidth = () => setScale(s => Number((s * 1.2).toFixed(2)));
 
   // Fullscreen Handler
   const handleToggleFullscreen = () => {
@@ -85,6 +119,12 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
       } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
         e.preventDefault();
         handlePrevPage();
+      } else if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        handleZoomIn();
+      } else if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        handleZoomOut();
       } else if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
         handleToggleFullscreen();
@@ -157,15 +197,16 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
 
       {/* Main 3D Realistic Page-Flipping Stage */}
       <main className="flex-1 min-h-0 w-full h-full relative flex items-center justify-center pt-14 pb-16 sm:pb-20 overflow-hidden">
-        <TurnFlipbook
-          ref={turnFlipbookRef}
+        <RealisticPageFlip
+          ref={pageFlipRef}
           pdfDocument={pdfDocument}
           currentPage={currentPage}
           totalPages={totalPages}
           scale={scale}
+          isDual={!isMobile}
           baseDimensions={baseDimensions}
           onPageChange={newPage => setCurrentPage(newPage)}
-          onDimensionsLoaded={dims => setBaseDimensions(dims)}
+          onPageLoaded={dims => setBaseDimensions(dims)}
         />
       </main>
     </div>

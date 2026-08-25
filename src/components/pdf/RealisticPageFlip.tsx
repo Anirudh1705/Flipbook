@@ -1,7 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { PdfPageCanvas } from './PdfPageCanvas';
 import { playPageTurnSound } from '../../lib/pageAudio';
+
+export interface RealisticPageFlipHandle {
+  flipNext: () => void;
+  flipPrev: () => void;
+  flipToPage: (page: number) => void;
+}
 
 interface RealisticPageFlipProps {
   pdfDocument: PDFDocumentProxy;
@@ -14,62 +20,93 @@ interface RealisticPageFlipProps {
   onPageLoaded?: (dims: { width: number; height: number }) => void;
 }
 
-export const RealisticPageFlip: React.FC<RealisticPageFlipProps> = ({
-  pdfDocument,
-  currentPage,
-  totalPages,
-  scale,
-  isDual,
-  baseDimensions,
-  onPageChange,
-  onPageLoaded,
-}) => {
-  // Flip animation state
-  const [isFlipping, setIsFlipping] = useState<boolean>(false);
-  const [flipDirection, setFlipDirection] = useState<'next' | 'prev' | null>(null);
-  const [flipProgress, setFlipProgress] = useState<number>(0); // 0 to 1
-  const [targetPage, setTargetPage] = useState<number>(currentPage);
+export const RealisticPageFlip = forwardRef<RealisticPageFlipHandle, RealisticPageFlipProps>(
+  (
+    {
+      pdfDocument,
+      currentPage,
+      totalPages,
+      scale,
+      isDual,
+      baseDimensions,
+      onPageChange,
+      onPageLoaded,
+    },
+    ref
+  ) => {
+    // Flip animation state
+    const [isFlipping, setIsFlipping] = useState<boolean>(false);
+    const [flipDirection, setFlipDirection] = useState<'next' | 'prev' | null>(null);
+    const [flipProgress, setFlipProgress] = useState<number>(0); // 0 to 1
+    const [targetPage, setTargetPage] = useState<number>(currentPage);
 
-  const animationFrameRef = useRef<number | null>(null);
-  const startTimeRef = useRef<number | null>(null);
+    const animationFrameRef = useRef<number | null>(null);
+    const startTimeRef = useRef<number | null>(null);
 
-  const FLIP_DURATION = 580; // ms for authentic page weight & feel
+    const FLIP_DURATION = 580; // ms for authentic page weight & feel
 
-  // Trigger smooth forward page turn
-  const flipNext = () => {
-    if (isFlipping || currentPage >= totalPages) return;
+    // Trigger smooth forward page turn
+    const flipNext = () => {
+      if (isFlipping || currentPage >= totalPages) return;
 
-    const nextTarget = isDual
-      ? (currentPage === 1 ? 2 : Math.min(currentPage + 2, totalPages))
-      : Math.min(currentPage + 1, totalPages);
+      const nextTarget = isDual
+        ? (currentPage === 1 ? 2 : Math.min(currentPage + 2, totalPages))
+        : Math.min(currentPage + 1, totalPages);
 
-    if (nextTarget === currentPage) return;
+      if (nextTarget === currentPage) return;
 
-    playPageTurnSound();
-    setFlipDirection('next');
-    setTargetPage(nextTarget);
-    setIsFlipping(true);
-    setFlipProgress(0);
-    startTimeRef.current = null;
-  };
+      playPageTurnSound();
+      setFlipDirection('next');
+      setTargetPage(nextTarget);
+      setIsFlipping(true);
+      setFlipProgress(0);
+      startTimeRef.current = null;
+    };
 
-  // Trigger smooth backward page turn
-  const flipPrev = () => {
-    if (isFlipping || currentPage <= 1) return;
+    // Trigger smooth backward page turn
+    const flipPrev = () => {
+      if (isFlipping || currentPage <= 1) return;
 
-    const prevTarget = isDual
-      ? (currentPage <= 3 ? 1 : Math.max(currentPage - 2, 2))
-      : Math.max(currentPage - 1, 1);
+      const prevTarget = isDual
+        ? (currentPage <= 3 ? 1 : Math.max(currentPage - 2, 2))
+        : Math.max(currentPage - 1, 1);
 
-    if (prevTarget === currentPage) return;
+      if (prevTarget === currentPage) return;
 
-    playPageTurnSound();
-    setFlipDirection('prev');
-    setTargetPage(prevTarget);
-    setIsFlipping(true);
-    setFlipProgress(0);
-    startTimeRef.current = null;
-  };
+      playPageTurnSound();
+      setFlipDirection('prev');
+      setTargetPage(prevTarget);
+      setIsFlipping(true);
+      setFlipProgress(0);
+      startTimeRef.current = null;
+    };
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        flipNext,
+        flipPrev,
+        flipToPage: (page: number) => {
+          if (page === currentPage || isFlipping) return;
+          if (page > currentPage) {
+            playPageTurnSound();
+            setFlipDirection('next');
+            setTargetPage(page);
+            setIsFlipping(true);
+            setFlipProgress(0);
+            startTimeRef.current = null;
+          } else {
+            playPageTurnSound();
+            setFlipDirection('prev');
+            setTargetPage(page);
+            setIsFlipping(true);
+            setFlipProgress(0);
+            startTimeRef.current = null;
+          }
+        },
+      }),
+      [currentPage, totalPages, isDual, isFlipping]
+    );
 
   // 60FPS Hardware-accelerated 3D transform progression
   useEffect(() => {
@@ -562,4 +599,7 @@ export const RealisticPageFlip: React.FC<RealisticPageFlipProps> = ({
       </div>
     </div>
   );
-};
+}
+);
+
+RealisticPageFlip.displayName = 'RealisticPageFlip';
