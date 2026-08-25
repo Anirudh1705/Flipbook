@@ -158,21 +158,21 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
         width: displayWidth,
         height: displayHeight,
         size: 'fixed',
-        minWidth: 240,
-        maxWidth: 1200,
-        minHeight: 340,
-        maxHeight: 1600,
-        maxShadowOpacity: 0.5,
-        showCover: true,
+        minWidth: 200,
+        maxWidth: 1400,
+        minHeight: 300,
+        maxHeight: 1800,
+        maxShadowOpacity: 0.4,
+        showCover: false,
         mobileScrollSupport: false,
-        flippingTime: 550,
+        flippingTime: 500,
         usePortrait: isMobile,
         startPage: Math.max(0, Math.min(currentPage - 1, totalPages - 1)),
         drawShadow: true,
         autoSize: true,
         useMouseEvents: true,
         showPageCorners: true,
-        swipeDistance: 25,
+        swipeDistance: 20,
       });
 
       const pageElements = bookEl.querySelectorAll<HTMLElement>('.page');
@@ -231,6 +231,7 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
         className="relative w-full flex items-center justify-center select-none overflow-visible p-1 sm:p-6"
       >
         <div
+          key={`${containerWidth}-${displayHeight}-${totalPages}`}
           ref={bookRef}
           className="turnjs-flipbook-container shadow-2xl rounded-lg mx-auto"
           style={{

@@ -22,13 +22,21 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
 
   // Viewport & Layout state - Defaults to interactive 3D Flipbook mode
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [scale, setScale] = useState<number>(1.0);
+  const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [spreadMode, setSpreadMode] = useState<'single' | 'double'>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 'single' : 'double'
+  );
+  const [scale, setScale] = useState<number>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      const availWidth = window.innerWidth - 24;
+      return Math.max(0.35, Math.min(0.95, Number((availWidth / 595).toFixed(2))));
+    }
+    return 1.0;
+  });
   const [viewMode, setViewMode] = useState<'scroll' | 'flipbook'>('flipbook');
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showThumbnails, setShowThumbnails] = useState<boolean>(false);
   const [showSearch, setShowSearch] = useState<boolean>(false);
-  const [spreadMode, setSpreadMode] = useState<'single' | 'double'>('double');
-  const [isMobile, setIsMobile] = useState<boolean>(false);
   const [baseDimensions, setBaseDimensions] = useState<{ width: number; height: number }>({
     width: 595,
     height: 842,
