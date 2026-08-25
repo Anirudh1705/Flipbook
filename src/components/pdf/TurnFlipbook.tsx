@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from 'react';
+import { useEffect, useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { PageFlip } from 'page-flip';
 import { playPageTurnSound } from '../../lib/pageAudio';
-import { Loader2 } from 'lucide-react';
 
 export interface TurnFlipbookHandle {
   flipNext: () => void;
@@ -20,10 +19,6 @@ interface TurnFlipbookProps {
   onDimensionsLoaded?: (dims: { width: number; height: number }) => void;
 }
 
-// 1x1 pure white JPEG placeholder
-const BLANK_PAGE_DATA_URL =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
-
 export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
   (
     {
@@ -40,14 +35,8 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
     const containerRef = useRef<HTMLDivElement | null>(null);
     const bookRef = useRef<HTMLDivElement | null>(null);
     const pageFlipInstanceRef = useRef<PageFlip | null>(null);
-    const [isInitialReady, setIsInitialReady] = useState<boolean>(false);
-    const [backgroundProgress, setBackgroundProgress] = useState<{ loaded: number; total: number }>({
-      loaded: 0,
-      total: totalPages,
-    });
-
-    const renderedImagesRef = useRef<string[]>(new Array(totalPages).fill(BLANK_PAGE_DATA_URL));
-    const isRenderingRef = useRef<boolean>(false);
+    const renderedPagesRef = useRef<Set<number>>(new Set());
+    const renderingPagesRef = useRef<Set<number>>(new Set());
 
     // Page Dimensions based on scale
     const baseW = Math.max(300, baseDimensions.width);
@@ -56,6 +45,7 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
     const displayHeight = Math.floor(baseH * scale);
 
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    const containerWidth = isMobile ? displayWidth : displayWidth * 2;
 
     // Expose control methods to parent toolbar
     useImperativeHandle(
@@ -83,17 +73,39 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
       [totalPages]
     );
 
-    // Helper: render a single page to crisp image
-    const renderSinglePage = useCallback(
-      async (pageNum: number, renderScale: number): Promise<string> => {
+    // Direct GPU Canvas rendering for individual page - executes in < 25ms
+    const renderPageDirect = useCallback(
+      async (pageNum: number) => {
+        if (!pdfDocument || pageNum < 1 || pageNum > totalPages) return;
+        if (renderedPagesRef.current.has(pageNum) || renderingPagesRef.current.has(pageNum)) return;
+
+        const canvas = document.getElementById(`flip-canvas-${pageNum}`) as HTMLCanvasElement;
+        if (!canvas) return;
+
+        renderingPagesRef.current.add(pageNum);
+
         try {
           const page = await pdfDocument.getPage(pageNum);
+          const unscaledVp = page.getViewport({ scale: 1.0 });
+
+          if (onDimensionsLoaded && pageNum === 1) {
+            onDimensionsLoaded({
+              width: unscaledVp.width,
+              height: unscaledVp.height,
+            });
+          }
+
+          const dpr = Math.min(window.devicePixelRatio || 1, 2);
+          const renderScale = (displayWidth / unscaledVp.width) * dpr;
           const viewport = page.getViewport({ scale: renderScale });
-          const canvas = document.createElement('canvas');
+
           canvas.width = Math.floor(viewport.width);
           canvas.height = Math.floor(viewport.height);
+          canvas.style.width = `${displayWidth}px`;
+          canvas.style.height = `${displayHeight}px`;
+
           const ctx = canvas.getContext('2d', { alpha: false });
-          if (!ctx) return BLANK_PAGE_DATA_URL;
+          if (!ctx) return;
 
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -104,95 +116,41 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
             canvas: canvas,
           }).promise;
 
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-          // Free canvas memory
-          canvas.width = 0;
-          canvas.height = 0;
-          return dataUrl;
-        } catch (err) {
-          console.warn(`Error rendering page ${pageNum}:`, err);
-          return BLANK_PAGE_DATA_URL;
+          renderedPagesRef.current.add(pageNum);
+        } catch (err: any) {
+          if (err.name !== 'RenderingCancelledException') {
+            console.warn(`Error rendering page ${pageNum}:`, err);
+          }
+        } finally {
+          renderingPagesRef.current.delete(pageNum);
         }
       },
-      [pdfDocument]
+      [pdfDocument, totalPages, displayWidth, displayHeight, onDimensionsLoaded]
     );
 
-    // Progressive streaming loader: Page 1-2 immediately, remainder in background chunks
-    useEffect(() => {
-      let isCancelled = false;
-      isRenderingRef.current = true;
-      renderedImagesRef.current = new Array(totalPages).fill(BLANK_PAGE_DATA_URL);
+    // Render active and surrounding pages dynamically
+    const renderSurroundingPages = useCallback(
+      (targetPage: number) => {
+        const pages = [
+          targetPage - 2,
+          targetPage - 1,
+          targetPage,
+          targetPage + 1,
+          targetPage + 2,
+          targetPage + 3,
+        ].filter(p => p >= 1 && p <= totalPages);
 
-      const loadProgressively = async () => {
-        if (!pdfDocument || totalPages === 0) return;
+        pages.forEach(p => {
+          renderPageDirect(p);
+        });
+      },
+      [totalPages, renderPageDirect]
+    );
 
-        try {
-          // 1. Check dimensions from page 1
-          const firstPage = await pdfDocument.getPage(1);
-          const unscaledVp = firstPage.getViewport({ scale: 1.0 });
-          if (onDimensionsLoaded) {
-            onDimensionsLoaded({
-              width: unscaledVp.width,
-              height: unscaledVp.height,
-            });
-          }
-
-          const dpr = Math.min(window.devicePixelRatio || 1, 2);
-          const renderScale = Math.max(1.1, Math.min(1.6, ((displayWidth * 1.25) / unscaledVp.width) * dpr));
-
-          // 2. High priority: Render initial pages (1 to 4) immediately so flipbook opens in < 300ms
-          const initialCount = Math.min(totalPages, 4);
-          for (let p = 1; p <= initialCount; p++) {
-            if (isCancelled) return;
-            const img = await renderSinglePage(p, renderScale);
-            renderedImagesRef.current[p - 1] = img;
-          }
-
-          if (!isCancelled) {
-            setIsInitialReady(true);
-            setBackgroundProgress({ loaded: initialCount, total: totalPages });
-          }
-
-          // 3. Background priority: Stream remaining pages sequentially without freezing UI
-          for (let p = initialCount + 1; p <= totalPages; p++) {
-            if (isCancelled) return;
-
-            // Yield thread for 15ms to allow silky smooth 60fps flipping animations
-            await new Promise(r => setTimeout(r, 15));
-
-            const img = await renderSinglePage(p, renderScale);
-            renderedImagesRef.current[p - 1] = img;
-
-            if (!isCancelled) {
-              setBackgroundProgress({ loaded: p, total: totalPages });
-              // Update flipbook page textures dynamically every 4 pages or on final page
-              if (p % 4 === 0 || p === totalPages) {
-                if (pageFlipInstanceRef.current) {
-                  try {
-                    pageFlipInstanceRef.current.updateFromImages([...renderedImagesRef.current]);
-                  } catch {}
-                }
-              }
-            }
-          }
-        } catch (err) {
-          console.error('Progressive render error:', err);
-        } finally {
-          isRenderingRef.current = false;
-        }
-      };
-
-      loadProgressively();
-
-      return () => {
-        isCancelled = true;
-      };
-    }, [pdfDocument, totalPages, displayWidth, onDimensionsLoaded, renderSinglePage]);
-
-    // Initialize PageFlip instance once initial pages are ready
+    // Initialize PageFlip engine immediately on mount (0ms delay)
     useEffect(() => {
       const bookEl = bookRef.current;
-      if (!bookEl || !isInitialReady) return;
+      if (!bookEl || !pdfDocument || totalPages === 0) return;
 
       // Clean up previous instance
       if (pageFlipInstanceRef.current) {
@@ -201,7 +159,8 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
         } catch {}
         pageFlipInstanceRef.current = null;
       }
-      bookEl.innerHTML = '';
+      renderedPagesRef.current.clear();
+      renderingPagesRef.current.clear();
 
       const isMobileScreen = window.innerWidth < 768;
 
@@ -226,22 +185,36 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
         swipeDistance: 25,
       });
 
-      pageFlip.loadFromImages([...renderedImagesRef.current]);
-      pageFlipInstanceRef.current = pageFlip;
+      const pageElements = bookEl.querySelectorAll<HTMLElement>('.page');
+      if (pageElements.length > 0) {
+        pageFlip.loadFromHTML(pageElements);
+        pageFlipInstanceRef.current = pageFlip;
 
-      // Event listeners
-      pageFlip.on('flip', (e: any) => {
-        const newPageIndex = typeof e.data === 'number' ? e.data : 0;
-        const newPageNumber = newPageIndex + 1;
-        playPageTurnSound();
-        onPageChange(newPageNumber);
-      });
+        // Render initial active pages instantly
+        renderSurroundingPages(currentPage);
 
-      pageFlip.on('changeState', (e: any) => {
-        if (e.data === 'flipping') {
+        // Preload upcoming pages smoothly
+        setTimeout(() => {
+          for (let p = 1; p <= Math.min(totalPages, 8); p++) {
+            renderPageDirect(p);
+          }
+        }, 100);
+
+        // Event listeners
+        pageFlip.on('flip', (e: any) => {
+          const newPageIndex = typeof e.data === 'number' ? e.data : 0;
+          const newPageNumber = newPageIndex + 1;
           playPageTurnSound();
-        }
-      });
+          onPageChange(newPageNumber);
+          renderSurroundingPages(newPageNumber);
+        });
+
+        pageFlip.on('changeState', (e: any) => {
+          if (e.data === 'flipping') {
+            playPageTurnSound();
+          }
+        });
+      }
 
       return () => {
         if (pageFlipInstanceRef.current) {
@@ -251,41 +224,57 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
           pageFlipInstanceRef.current = null;
         }
       };
-    }, [isInitialReady, displayWidth, displayHeight, totalPages, onPageChange]);
+    }, [pdfDocument, displayWidth, displayHeight, totalPages, renderSurroundingPages, renderPageDirect, onPageChange, currentPage]);
+
+    // Keep surrounding pages loaded when currentPage changes
+    useEffect(() => {
+      renderSurroundingPages(currentPage);
+    }, [currentPage, renderSurroundingPages]);
 
     return (
       <div
         ref={containerRef}
         className="relative w-full h-full flex items-center justify-center select-none overflow-visible p-2 sm:p-6"
       >
-        {!isInitialReady && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/70 backdrop-blur-sm z-20">
-            <Loader2 className="w-9 h-9 text-brand-400 animate-spin mb-3" />
-            <p className="text-slate-300 text-xs sm:text-sm font-medium tracking-wide">
-              Opening Publication...
-            </p>
-          </div>
-        )}
-
-        {/* Subtle background streaming indicator for large PDFs */}
-        {isInitialReady && backgroundProgress.loaded < backgroundProgress.total && (
-          <div className="absolute top-3 right-4 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-800 text-[11px] text-slate-400">
-            <div className="w-2 h-2 rounded-full bg-brand-400 animate-pulse" />
-            <span>
-              Indexing pages {backgroundProgress.loaded}/{backgroundProgress.total}...
-            </span>
-          </div>
-        )}
-
         <div
           ref={bookRef}
           className="turnjs-flipbook-container shadow-2xl rounded-lg mx-auto"
           style={{
-            width: `${isMobile ? displayWidth : displayWidth * 2}px`,
+            width: `${containerWidth}px`,
             height: `${displayHeight}px`,
             minHeight: '280px',
           }}
-        />
+        >
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
+            <div
+              key={pageNum}
+              className="page bg-white overflow-hidden"
+              data-density="soft"
+              style={{
+                width: `${displayWidth}px`,
+                height: `${displayHeight}px`,
+                backgroundColor: '#ffffff',
+              }}
+            >
+              <div
+                className="page-content relative w-full h-full flex items-center justify-center bg-white overflow-hidden"
+                style={{
+                  width: `${displayWidth}px`,
+                  height: `${displayHeight}px`,
+                }}
+              >
+                <canvas
+                  id={`flip-canvas-${pageNum}`}
+                  className="block bg-white"
+                  style={{
+                    width: `${displayWidth}px`,
+                    height: `${displayHeight}px`,
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
