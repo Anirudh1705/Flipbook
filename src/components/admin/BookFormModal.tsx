@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Save, FileUp, Link2, AlertCircle, FileText, CheckCircle2 } from 'lucide-react';
 import type { Book } from '../../types/book';
 import { resolveDirectPdfUrl } from '../../lib/pdfUrlResolver';
+import { savePdfToStorage } from '../../lib/pdfStorage';
 
 interface BookFormModalProps {
   isOpen: boolean;
@@ -17,8 +18,9 @@ export const BookFormModal: React.FC<BookFormModalProps> = ({
   initialBook,
 }) => {
   const [title, setTitle] = useState<string>('');
-  const [pdfSourceType, setPdfSourceType] = useState<'upload' | 'url'>('url');
+  const [pdfSourceType, setPdfSourceType] = useState<'upload' | 'url'>('upload');
   const [pdfUrl, setPdfUrl] = useState<string>('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [selectedFileSize, setSelectedFileSize] = useState<number>(50 * 1024 * 1024);
   const [saving, setSaving] = useState<boolean>(false);
@@ -29,13 +31,15 @@ export const BookFormModal: React.FC<BookFormModalProps> = ({
     if (initialBook) {
       setTitle(initialBook.title);
       setPdfUrl(initialBook.pdf_url);
-      setPdfSourceType('url');
+      setPdfSourceType(initialBook.pdf_url.startsWith('idb://') ? 'upload' : 'url');
+      setSelectedFile(null);
       setSelectedFileName(null);
       setSelectedFileSize(initialBook.file_size || 50 * 1024 * 1024);
     } else {
       setTitle('');
       setPdfUrl('');
-      setPdfSourceType('url');
+      setPdfSourceType('upload');
+      setSelectedFile(null);
       setSelectedFileName(null);
       setSelectedFileSize(50 * 1024 * 1024);
     }
@@ -53,6 +57,7 @@ export const BookFormModal: React.FC<BookFormModalProps> = ({
     }
 
     setError(null);
+    setSelectedFile(file);
     setSelectedFileName(file.name);
     setSelectedFileSize(file.size);
 
@@ -61,10 +66,6 @@ export const BookFormModal: React.FC<BookFormModalProps> = ({
       const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]+/g, ' ');
       setTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
     }
-
-    // Create a local blob URL for instant previewing
-    const blobUrl = URL.createObjectURL(file);
-    setPdfUrl(blobUrl);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -75,17 +76,19 @@ export const BookFormModal: React.FC<BookFormModalProps> = ({
       return;
     }
 
-    if (!pdfUrl.trim()) {
-      setError('Please provide a PDF URL or select a PDF file.');
+    if (pdfSourceType === 'upload' && !selectedFile && !initialBook?.pdf_url) {
+      setError('Please select a PDF file from your computer.');
+      return;
+    }
+
+    if (pdfSourceType === 'url' && !pdfUrl.trim()) {
+      setError('Please provide a direct PDF URL.');
       return;
     }
 
     try {
       setSaving(true);
       setError(null);
-
-      // Auto-resolve any webpage URL (e.g. archive.org/details/..., github, dropbox) to direct PDF
-      const finalPdfUrl = await resolveDirectPdfUrl(pdfUrl.trim());
 
       // Auto-generate clean slug from title
       const cleanSlug =
@@ -96,7 +99,20 @@ export const BookFormModal: React.FC<BookFormModalProps> = ({
           .replace(/[^a-z0-9]+/g, '-')
           .replace(/(^-|-$)+/g, '');
 
-      // Curated default high-resolution cover artwork
+      let finalPdfUrl = '';
+
+      if (pdfSourceType === 'upload' && selectedFile) {
+        // Save file locally to browser IndexedDB (persists across page reloads & tabs with 0 accounts needed)
+        const fileKey = `pdf_${Date.now()}_${cleanSlug}`;
+        finalPdfUrl = await savePdfToStorage(fileKey, selectedFile);
+      } else if (pdfSourceType === 'upload' && initialBook?.pdf_url) {
+        finalPdfUrl = initialBook.pdf_url;
+      } else {
+        // Resolve online link
+        finalPdfUrl = await resolveDirectPdfUrl(pdfUrl.trim());
+      }
+
+      // Default high-resolution cover artwork
       const defaultCover =
         initialBook?.cover_url ||
         'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?q=80&w=800&auto=format&fit=crop';
@@ -139,7 +155,7 @@ export const BookFormModal: React.FC<BookFormModalProps> = ({
               <h2 className="text-base font-bold text-slate-100">
                 {initialBook ? 'Edit Publication' : 'Add New PDF'}
               </h2>
-              <p className="text-[11px] text-slate-400">Enter title and provide your PDF</p>
+              <p className="text-[11px] text-slate-400">Enter title and select your PDF</p>
             </div>
           </div>
 
@@ -187,18 +203,6 @@ export const BookFormModal: React.FC<BookFormModalProps> = ({
               <div className="flex bg-slate-900 rounded-lg p-0.5 border border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setPdfSourceType('url')}
-                  className={`px-2 py-1 rounded-md text-[11px] font-medium flex items-center gap-1 transition-all ${
-                    pdfSourceType === 'url'
-                      ? 'bg-brand-500 text-slate-950 font-bold shadow-sm'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Link2 className="w-3 h-3" />
-                  <span>PDF Link / R2</span>
-                </button>
-                <button
-                  type="button"
                   onClick={() => setPdfSourceType('upload')}
                   className={`px-2 py-1 rounded-md text-[11px] font-medium flex items-center gap-1 transition-all ${
                     pdfSourceType === 'upload'
@@ -209,25 +213,22 @@ export const BookFormModal: React.FC<BookFormModalProps> = ({
                   <FileUp className="w-3 h-3" />
                   <span>Upload File</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setPdfSourceType('url')}
+                  className={`px-2 py-1 rounded-md text-[11px] font-medium flex items-center gap-1 transition-all ${
+                    pdfSourceType === 'url'
+                      ? 'bg-brand-500 text-slate-950 font-bold shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Link2 className="w-3 h-3" />
+                  <span>PDF Link</span>
+                </button>
               </div>
             </div>
 
-            {pdfSourceType === 'url' ? (
-              /* URL Input */
-              <div className="space-y-1">
-                <input
-                  type="url"
-                  required
-                  value={pdfUrl}
-                  onChange={e => setPdfUrl(e.target.value)}
-                  placeholder="https://pub-r2.example.com/books/publication.pdf"
-                  className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 font-mono text-xs focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder:text-slate-600"
-                />
-                <p className="text-[10px] text-slate-500 font-mono">
-                  Paste your Cloudflare R2, Archive.org, or any direct PDF link
-                </p>
-              </div>
-            ) : (
+            {pdfSourceType === 'upload' ? (
               /* Upload Drag & Drop Area */
               <div>
                 <input
@@ -253,13 +254,28 @@ export const BookFormModal: React.FC<BookFormModalProps> = ({
                       </div>
                       <div>
                         <span className="font-semibold text-slate-200 group-hover:text-white">
-                          Click to choose PDF file
+                          Click to choose PDF file from computer
                         </span>
-                        <p className="text-[10px] text-slate-500 mt-0.5">Supports up to 500 MB PDFs</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Instant local storage • Zero setup</p>
                       </div>
                     </>
                   )}
                 </div>
+              </div>
+            ) : (
+              /* URL Input */
+              <div className="space-y-1">
+                <input
+                  type="url"
+                  required
+                  value={pdfUrl}
+                  onChange={e => setPdfUrl(e.target.value)}
+                  placeholder="https://example.com/document.pdf or archive.org link"
+                  className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 font-mono text-xs focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all placeholder:text-slate-600"
+                />
+                <p className="text-[10px] text-slate-500 font-mono">
+                  Paste any direct PDF link or Archive.org link
+                </p>
               </div>
             )}
           </div>

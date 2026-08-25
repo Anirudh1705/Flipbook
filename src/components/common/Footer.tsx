@@ -16,7 +16,7 @@ export const Footer: React.FC = () => {
               </span>
             </div>
             <p className="text-slate-400 text-sm leading-relaxed max-w-md">
-              A high-performance digital reader engineered specifically for 300–500 MB publications. Powered by Mozilla PDF.js, HTTP Range Byte-Streaming, Cloudflare R2, and Supabase PostgreSQL.
+              A high-performance digital reader engineered for seamless publication viewing. Powered by Mozilla PDF.js with continuous scrolling, double-spread view, and instant local storage.
             </p>
           </div>
 
@@ -25,19 +25,19 @@ export const Footer: React.FC = () => {
             <ul className="space-y-2 text-xs text-slate-400">
               <li className="flex items-center gap-2">
                 <Zap className="w-3.5 h-3.5 text-amber-400" />
-                <span>PDF.js 64KB HTTP Range Stream</span>
+                <span>PDF.js Byte-Range Streaming</span>
               </li>
               <li className="flex items-center gap-2">
                 <Server className="w-3.5 h-3.5 text-sky-400" />
-                <span>Cloudflare R2 Object Storage</span>
+                <span>IndexedDB Client Storage</span>
               </li>
               <li className="flex items-center gap-2">
                 <Globe className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Cloudflare Pages SPA Edge</span>
+                <span>Vercel Edge SPA Hosting</span>
               </li>
               <li className="flex items-center gap-2">
                 <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Supabase PostgreSQL + RLS</span>
+                <span>Private Publication Routing</span>
               </li>
             </ul>
           </div>
@@ -45,11 +45,11 @@ export const Footer: React.FC = () => {
           <div>
             <h4 className="font-semibold text-slate-200 text-sm mb-3">Technical Highlights</h4>
             <ul className="space-y-2 text-xs text-slate-400">
-              <li>• Virtualized IntersectionObserver Sidebar</li>
-              <li>• Dual-Page Spread + Spine Shading</li>
+              <li>• Continuous Vertical Scroller Mode</li>
+              <li>• Dual-Page Spread + Single View</li>
               <li>• Mobile Swipe & Pinch-to-Zoom</li>
               <li>• In-Document Text Search</li>
-              <li>• Local Memory Progress Sync</li>
+              <li>• Zero-Cloud Local File Uploads</li>
             </ul>
           </div>
         </div>
@@ -57,7 +57,7 @@ export const Footer: React.FC = () => {
         <div className="pt-8 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <p>© {new Date().getFullYear()} Digital Flipbook Library. Engineered for high-capacity publications.</p>
           <div className="flex items-center gap-4">
-            <span>Accept-Ranges: bytes</span>
+            <span>Instant Local Storage</span>
             <span>•</span>
             <span>Zero-Buffer Startup</span>
           </div>

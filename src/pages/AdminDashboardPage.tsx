@@ -2,17 +2,15 @@ import React, { useState } from 'react';
 import { AdminLayout } from '../components/admin/AdminLayout';
 import { BookTable } from '../components/admin/BookTable';
 import { BookFormModal } from '../components/admin/BookFormModal';
-import { R2GuideModal } from '../components/admin/R2GuideModal';
 import { SEO } from '../components/common/SEO';
 import { useBooks } from '../hooks/useBooks';
 import type { Book } from '../types/book';
-import { BookOpen, CheckCircle2, Clock, Cloud, Search } from 'lucide-react';
+import { BookOpen, CheckCircle2, Clock, Search } from 'lucide-react';
 
 export const AdminDashboardPage: React.FC = () => {
   const { books, loading, saveBook, deleteBook, togglePublish } = useBooks();
 
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
-  const [isR2GuideOpen, setIsR2GuideOpen] = useState<boolean>(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -48,7 +46,7 @@ export const AdminDashboardPage: React.FC = () => {
   });
 
   return (
-    <AdminLayout onOpenR2Guide={() => setIsR2GuideOpen(true)} onOpenAddModal={handleAddNew}>
+    <AdminLayout onOpenAddModal={handleAddNew}>
       <SEO title="Admin Dashboard | Flipbook Pro" />
 
       <div className="space-y-8">
@@ -97,16 +95,6 @@ export const AdminDashboardPage: React.FC = () => {
               className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-100 placeholder-slate-500 focus:border-brand-500 outline-none"
             />
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsR2GuideOpen(true)}
-              className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 text-sky-400 text-xs font-medium flex items-center gap-1.5 transition-colors"
-            >
-              <Cloud className="w-3.5 h-3.5" />
-              <span>R2 Storage Instructions</span>
-            </button>
-          </div>
         </div>
 
         {/* Publications Table */}
@@ -130,11 +118,6 @@ export const AdminDashboardPage: React.FC = () => {
         onClose={() => setIsFormOpen(false)}
         onSave={handleSave}
         initialBook={editingBook}
-      />
-
-      <R2GuideModal
-        isOpen={isR2GuideOpen}
-        onClose={() => setIsR2GuideOpen(false)}
       />
     </AdminLayout>
   );

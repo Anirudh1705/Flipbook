@@ -32,9 +32,9 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
 
           <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-400 text-left space-y-1 font-mono">
             <div className="text-slate-300 font-semibold">Troubleshooting checklist:</div>
-            <div>• Confirm Cloudflare R2 bucket has CORS enabled</div>
-            <div>• Verify <code className="text-brand-400">Accept-Ranges: bytes</code> header</div>
-            <div>• Check that the PDF URL is accessible directly</div>
+            <div>• Check your network connection</div>
+            <div>• If using an external URL, ensure the link is direct & accessible</div>
+            <div>• If uploaded locally, you can re-upload from Admin Dashboard</div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
@@ -48,11 +48,11 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
               </button>
             )}
             <Link
-              to="/"
+              to="/admin"
               className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-sm transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Back to Library</span>
+              <span>Admin Dashboard</span>
             </Link>
           </div>
         </div>
@@ -91,13 +91,13 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
             )}
           </div>
           <div className="flex justify-between items-center text-[11px] text-slate-500 font-mono">
-            <span>Range-Streaming (64KB chunks)</span>
-            <span>{progress >= 0 ? `${progress}%` : 'Streaming bytes...'}</span>
+            <span>Progressive byte streaming</span>
+            <span>{progress >= 0 ? `${progress}%` : 'Loading...'}</span>
           </div>
         </div>
 
         <p className="text-xs text-slate-400 italic">
-          Zero full-file download wait. First page renders immediately as byte chunks stream.
+          Zero full-file download wait. Renders seamlessly as bytes are indexed.
         </p>
       </div>
     </div>

@@ -44,7 +44,7 @@ export function usePdfDocument(url?: string): UsePdfDocumentResult {
 
         if (!isMounted) return;
 
-        const loadingTask = getOptimizedDocumentTask(directUrl);
+        const loadingTask = await getOptimizedDocumentTask(directUrl);
         loadingTaskRef.current = loadingTask;
 
         loadingTask.onProgress = ({ loaded, total }: { loaded: number; total: number }) => {
@@ -82,6 +82,8 @@ export function usePdfDocument(url?: string): UsePdfDocumentResult {
           userMsg = 'The PDF file is corrupted or not a valid PDF format.';
         } else if (err.message && err.message.includes('CORS')) {
           userMsg = 'CORS Error: The PDF storage server does not allow cross-origin requests.';
+        } else if (err.message) {
+          userMsg = err.message;
         }
         setError(userMsg);
         setLoading(false);
