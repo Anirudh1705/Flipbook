@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { Book } from '../../types/book';
-import { PdfPageCanvas } from './PdfPageCanvas';
 import { PdfScrollPage } from './PdfScrollPage';
+import { RealisticPageFlip } from './RealisticPageFlip';
 import { PdfToolbar } from './PdfToolbar';
 import { PdfThumbnails } from './PdfThumbnails';
 import { PdfSearchModal } from './PdfSearchModal';
@@ -21,10 +21,10 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const totalPages = pdfDocument.numPages;
 
-  // Viewport & Layout state
+  // Viewport & Layout state - Defaults to interactive 3D Flipbook mode
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [scale, setScale] = useState<number>(1.0);
-  const [viewMode, setViewMode] = useState<'scroll' | 'flipbook'>('scroll');
+  const [viewMode, setViewMode] = useState<'scroll' | 'flipbook'>('flipbook');
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showThumbnails, setShowThumbnails] = useState<boolean>(false);
   const [showSearch, setShowSearch] = useState<boolean>(false);
@@ -259,10 +259,6 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
     }
   };
 
-  const isDual = spreadMode === 'double' && !isMobile && currentPage > 1;
-  const leftPageNum = isDual ? currentPage : currentPage;
-  const rightPageNum = isDual ? currentPage + 1 : null;
-
   return (
     <div
       ref={containerRef}
@@ -360,13 +356,13 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
           </div>
         </main>
       ) : (
-        /* 2. PAGINATED / DUAL SPREAD FLIPBOOK MODE */
+        /* 2. PAGINATED / DUAL SPREAD 3D FLIPBOOK MODE */
         <main className="flex-1 w-full overflow-auto flex items-center justify-center p-4 sm:p-8 pt-16 pb-20 relative">
           <button
             onClick={handlePrevPage}
             disabled={currentPage <= 1}
-            className="hidden lg:flex absolute left-4 z-20 w-12 h-12 rounded-2xl bg-slate-900/60 hover:bg-brand-500 text-slate-300 hover:text-slate-950 items-center justify-center border border-slate-800 backdrop-blur-md shadow-xl disabled:opacity-0 disabled:pointer-events-none transition-all"
-            title="Previous Page"
+            className="hidden lg:flex absolute left-4 z-30 w-12 h-12 rounded-2xl bg-slate-900/70 hover:bg-brand-500 text-slate-300 hover:text-slate-950 items-center justify-center border border-slate-800 backdrop-blur-md shadow-xl disabled:opacity-0 disabled:pointer-events-none transition-all hover:scale-105 active:scale-95"
+            title="Previous Page (Left Arrow)"
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
@@ -374,54 +370,22 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
           <button
             onClick={handleNextPage}
             disabled={currentPage >= totalPages}
-            className="hidden lg:flex absolute right-4 z-20 w-12 h-12 rounded-2xl bg-slate-900/60 hover:bg-brand-500 text-slate-300 hover:text-slate-950 items-center justify-center border border-slate-800 backdrop-blur-md shadow-xl disabled:opacity-0 disabled:pointer-events-none transition-all"
-            title="Next Page"
+            className="hidden lg:flex absolute right-4 z-30 w-12 h-12 rounded-2xl bg-slate-900/70 hover:bg-brand-500 text-slate-300 hover:text-slate-950 items-center justify-center border border-slate-800 backdrop-blur-md shadow-xl disabled:opacity-0 disabled:pointer-events-none transition-all hover:scale-105 active:scale-95"
+            title="Next Page (Right Arrow / Space)"
           >
             <ChevronRight className="w-6 h-6" />
           </button>
 
-          <div className="perspective-1000 flex items-center justify-center">
-            {isDual ? (
-              <div className="relative flex items-center shadow-2xl rounded-lg overflow-hidden border border-slate-800/80 bg-slate-900">
-                <PdfPageCanvas
-                  pdfDocument={pdfDocument}
-                  pageNumber={leftPageNum}
-                  scale={scale}
-                  side="left"
-                  onPageLoaded={dims => setBaseDimensions(dims)}
-                />
-                <div className="w-4 h-full absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none book-spine-gradient" />
-                {rightPageNum && rightPageNum <= totalPages ? (
-                  <PdfPageCanvas
-                    pdfDocument={pdfDocument}
-                    pageNumber={rightPageNum}
-                    scale={scale}
-                    side="right"
-                  />
-                ) : (
-                  <div
-                    className="bg-white page-shadow-right flex items-center justify-center text-slate-300 font-mono text-xs"
-                    style={{
-                      width: `${baseDimensions.width * scale}px`,
-                      height: `${baseDimensions.height * scale}px`,
-                    }}
-                  >
-                    End of Publication
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="shadow-2xl rounded-lg overflow-hidden border border-slate-800/80 bg-slate-900">
-                <PdfPageCanvas
-                  pdfDocument={pdfDocument}
-                  pageNumber={currentPage}
-                  scale={scale}
-                  side="single"
-                  onPageLoaded={dims => setBaseDimensions(dims)}
-                />
-              </div>
-            )}
-          </div>
+          <RealisticPageFlip
+            pdfDocument={pdfDocument}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            scale={scale}
+            isDual={spreadMode === 'double' && !isMobile}
+            baseDimensions={baseDimensions}
+            onPageChange={newPage => setCurrentPage(newPage)}
+            onPageLoaded={dims => setBaseDimensions(dims)}
+          />
         </main>
       )}
     </div>
