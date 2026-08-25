@@ -241,16 +241,12 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
                 <div className="relative w-full h-full flex items-center justify-center bg-white overflow-hidden">
                   <canvas
                     id={`flip-canvas-${pageNum}`}
-                    className="block shadow-inner"
+                    className="block"
                     style={{
                       width: `${displayWidth}px`,
                       height: `${displayHeight}px`,
                     }}
                   />
-                  {/* Subtle page watermark indicator */}
-                  <div className="absolute bottom-2.5 left-0 right-0 text-center pointer-events-none opacity-30 text-[10px] font-mono text-slate-800">
-                    — {pageNum} —
-                  </div>
                 </div>
               </div>
             );

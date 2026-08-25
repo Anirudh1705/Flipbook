@@ -19,7 +19,6 @@ export const PdfPageCanvas: React.FC<PdfPageCanvasProps> = ({
   onPageLoaded,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [rendering, setRendering] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const renderTaskRef = useRef<any>(null);
   const pageProxyRef = useRef<PDFPageProxy | null>(null);
@@ -34,7 +33,6 @@ export const PdfPageCanvas: React.FC<PdfPageCanvasProps> = ({
 
     async function renderPage() {
       try {
-        setRendering(true);
         setError(null);
 
         // Cancel previous render task if active
@@ -83,15 +81,10 @@ export const PdfPageCanvas: React.FC<PdfPageCanvasProps> = ({
         renderTaskRef.current = renderTask;
 
         await renderTask.promise;
-
-        if (!isCancelled) {
-          setRendering(false);
-        }
       } catch (err: any) {
         if (err.name !== 'RenderingCancelledException' && !isCancelled) {
           console.warn(`Render error on page ${pageNumber}:`, err);
           setError('Page render error');
-          setRendering(false);
         }
       }
     }
@@ -126,21 +119,6 @@ export const PdfPageCanvas: React.FC<PdfPageCanvasProps> = ({
       className={`relative inline-block select-none overflow-hidden bg-white ${getSideShadowClass()} ${className}`}
     >
       <canvas ref={canvasRef} className="block transition-opacity duration-200" />
-
-      {/* Loading Skeleton */}
-      {rendering && (
-        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[2px] flex items-center justify-center">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-950/80 border border-slate-800 text-[11px] font-mono text-slate-300">
-            <span className="w-2 h-2 rounded-full bg-brand-400 animate-ping" />
-            <span>Streaming Page {pageNumber}...</span>
-          </div>
-        </div>
-      )}
-
-      {/* Page Number Subtle Watermark */}
-      <div className="absolute bottom-2 left-0 right-0 text-center pointer-events-none opacity-40 text-[10px] font-mono text-slate-700">
-        — {pageNumber} —
-      </div>
 
       {error && (
         <div className="absolute inset-0 bg-red-950/80 flex items-center justify-center p-4 text-center">

@@ -83,19 +83,9 @@ export const PdfScrollPage: React.FC<PdfScrollPageProps> = ({
         /* Placeholder to maintain scroll height and prevent layout shift */
         <div
           style={{ width: `${targetWidth}px`, height: `${targetHeight}px` }}
-          className="flex items-center justify-center bg-slate-900/40 text-slate-500 font-mono text-xs"
-        >
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-slate-600 animate-pulse" />
-            <span>Page {pageNumber}</span>
-          </div>
-        </div>
+          className="bg-white"
+        />
       )}
-
-      {/* Floating subtle page number tag */}
-      <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-slate-950/70 text-slate-300 text-[10px] font-mono border border-slate-800/80 backdrop-blur-sm pointer-events-none">
-        {pageNumber}
-      </div>
     </div>
   );
 };
