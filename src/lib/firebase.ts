@@ -21,18 +21,18 @@ import {
 import type { Book } from '../types/book';
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyBmxXVI9IYW0UGqZKCFNXoQ3WlM_WwsMQE',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'flipbok-703a1.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'flipbok-703a1',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'flipbok-703a1.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '210274607699',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:210274607699:web:9a11caf4974af01a605ca6',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-GRQ7Y6B7J1',
 };
 
 export const isFirebaseConfigured = Boolean(
   firebaseConfig.apiKey &&
-  firebaseConfig.projectId &&
-  firebaseConfig.apiKey !== 'your-firebase-api-key'
+  firebaseConfig.projectId
 );
 
 let app: FirebaseApp | null = null;
@@ -57,7 +57,7 @@ export { auth, db };
  */
 export async function loginWithFirebase(email: string, pass: string): Promise<User> {
   if (!auth) {
-    throw new Error('Firebase is not configured. Please add your Firebase credentials in .env');
+    throw new Error('Firebase is not configured.');
   }
   const credential = await signInWithEmailAndPassword(auth, email, pass);
   return credential.user;
