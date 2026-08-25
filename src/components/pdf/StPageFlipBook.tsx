@@ -94,20 +94,25 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
           let targetPageH: number;
 
           if (isMobile) {
-            // Full mobile width fill (100% of mobile screen width)
-            targetPageW = window.innerWidth;
-            targetPageH = Math.round((rawH / rawW) * targetPageW);
+            // Mobile: Full width fill maximizing readability on smartphones
+            const screenW = window.innerWidth;
+            const availH = window.innerHeight - 50;
+            const fitW = screenW / rawW;
+            const fitH = availH / rawH;
+            const fit = Math.max(fitW, Math.min(fitW, fitH));
+            targetPageW = Math.round(rawW * fit);
+            targetPageH = Math.round(rawH * fit);
           } else if (isLandscapePdf) {
             // Desktop landscape slide: fill entire available stage
-            const availW = window.innerWidth - 20;
-            const availH = window.innerHeight - 60;
+            const availW = window.innerWidth - 8;
+            const availH = window.innerHeight - 50;
             const fit = Math.min(availW / rawW, availH / rawH);
             targetPageW = Math.round(rawW * fit);
             targetPageH = Math.round(rawH * fit);
           } else {
-            // Desktop 2-page spread: maximize to fill monitor height & width
-            const availW = window.innerWidth - 20;
-            const availH = window.innerHeight - 60;
+            // Desktop 2-page spread: maximize to 100% fill monitor height & width
+            const availW = window.innerWidth - 8;
+            const availH = window.innerHeight - 50;
             const fit = Math.min(availW / (rawW * 2), availH / rawH);
             targetPageW = Math.round(rawW * fit);
             targetPageH = Math.round(rawH * fit);
@@ -116,9 +121,9 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
           setBookSize({ width: targetPageW, height: targetPageH });
 
           const renderedUrls: string[] = [];
-          // Ultra-high DPI scale for crystal clear, razor-sharp text and graphics
+          // Ultra-HD 4K scale (3.0x - 4.0x) for crystal-clear, razor-sharp typography and math
           const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
-          const renderScale = Math.max(2.5, dpr * 2.0);
+          const renderScale = Math.max(3.0, dpr * 2.5);
 
           for (let i = 1; i <= totalPages; i++) {
             if (isCancelled) return;
@@ -132,7 +137,7 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
             const ctx = canvas.getContext('2d', { alpha: false });
 
             if (ctx) {
-              // Enable high quality image smoothing
+              // Enable maximum quality image smoothing
               ctx.imageSmoothingEnabled = true;
               ctx.imageSmoothingQuality = 'high';
               ctx.fillStyle = '#ffffff';
@@ -146,16 +151,8 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
               } as any);
 
               await renderTask.promise;
-              // Use high quality WebP/PNG for ultra-sharp typography without JPEG artifacts
-              let dataUrl: string;
-              try {
-                dataUrl = canvas.toDataURL('image/webp', 0.98);
-                if (!dataUrl.startsWith('data:image/webp')) {
-                  dataUrl = canvas.toDataURL('image/png');
-                }
-              } catch {
-                dataUrl = canvas.toDataURL('image/png');
-              }
+              // Use lossless PNG for 100% sharp text with zero compression artifacts
+              const dataUrl = canvas.toDataURL('image/png');
               renderedUrls.push(dataUrl);
             }
 
