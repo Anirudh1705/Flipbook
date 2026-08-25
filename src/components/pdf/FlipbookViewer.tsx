@@ -42,31 +42,34 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
     const isMobileView = window.innerWidth < 768;
     setIsMobile(isMobileView);
 
-    const availWidth = Math.max(280, container.clientWidth - (isMobileView ? 24 : 64));
-    const availHeight = Math.max(300, container.clientHeight - (isMobileView ? 110 : 140));
-
     if (viewMode === 'scroll') {
       if (isMobileView) {
-        const optimal = availWidth / baseDimensions.width;
-        setScale(Math.max(0.35, Math.min(1.15, Number(optimal.toFixed(2)))));
+        // On mobile, fill the entire screen width (100% width, 0 waste)
+        const screenW = window.innerWidth || container.clientWidth || 390;
+        const optimal = screenW / baseDimensions.width;
+        setScale(Number(optimal.toFixed(3)));
       } else {
-        const targetColWidth = Math.min(availWidth - 24, 920);
+        const availWidth = Math.max(280, container.clientWidth - 48);
+        const targetColWidth = Math.min(availWidth, 960);
         const optimal = targetColWidth / baseDimensions.width;
-        setScale(Math.max(0.4, Math.min(1.4, Number(optimal.toFixed(2)))));
+        setScale(Math.max(0.4, Math.min(1.5, Number(optimal.toFixed(3)))));
       }
     } else {
       // 3D Flipbook mode
+      const availWidth = Math.max(280, container.clientWidth - (isMobileView ? 8 : 64));
+      const availHeight = Math.max(300, container.clientHeight - (isMobileView ? 70 : 140));
+
       if (isMobileView || spreadMode === 'single') {
         const fitW = availWidth / baseDimensions.width;
         const fitH = availHeight / baseDimensions.height;
-        const optimal = Math.min(fitW, fitH, 1.1);
-        setScale(Math.max(0.35, Number(optimal.toFixed(2))));
+        const optimal = Math.min(fitW, fitH, 1.3);
+        setScale(Math.max(0.5, Number(optimal.toFixed(3))));
       } else {
         // 2-page spread on desktop
         const fitW = availWidth / (baseDimensions.width * 2);
         const fitH = availHeight / baseDimensions.height;
-        const optimal = Math.min(fitW, fitH, 1.3);
-        setScale(Math.max(0.4, Number(optimal.toFixed(2))));
+        const optimal = Math.min(fitW, fitH, 1.4);
+        setScale(Math.max(0.4, Number(optimal.toFixed(3))));
       }
     }
   }, [baseDimensions, viewMode, spreadMode]);

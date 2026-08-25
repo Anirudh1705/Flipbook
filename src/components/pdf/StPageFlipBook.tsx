@@ -98,23 +98,27 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
           let targetPageW: number;
           let targetPageH: number;
 
-          if (isMobile || isLandscapePdf) {
-            // Single page fitting
+          if (isMobile) {
+            // Full mobile width fill (100% of mobile screen width, zero waste!)
+            targetPageW = Math.min(window.innerWidth - 8, 480);
+            targetPageH = Math.round((rawH / rawW) * targetPageW);
+          } else if (isLandscapePdf) {
+            // Desktop landscape slide
             const fitW = (stageW - 20) / rawW;
             const fitH = (stageH - 20) / rawH;
-            const fit = Math.min(fitW, fitH, 1.2);
+            const fit = Math.min(fitW, fitH, 1.5);
             targetPageW = Math.round(rawW * fit);
             targetPageH = Math.round(rawH * fit);
           } else {
             // Dual spread fitting on desktop (two pages side by side)
             const fitW = (stageW - 30) / (rawW * 2);
             const fitH = (stageH - 20) / rawH;
-            const fit = Math.min(fitW, fitH, 1.2);
+            const fit = Math.min(fitW, fitH, 1.5);
             targetPageW = Math.round(rawW * fit);
             targetPageH = Math.round(rawH * fit);
           }
 
-          setBookSize({ width: Math.max(260, targetPageW), height: Math.max(360, targetPageH) });
+          setBookSize({ width: Math.max(300, targetPageW), height: Math.max(400, targetPageH) });
 
           const renderedUrls: string[] = [];
           // Ultra-high DPI scale for crystal clear, razor-sharp text and graphics
