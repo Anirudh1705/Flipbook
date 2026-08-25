@@ -2,6 +2,8 @@ import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import {
   getAuth,
   signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   type User,
@@ -76,6 +78,30 @@ export async function loginWithFirebase(email: string, pass: string): Promise<Us
   }
 
   localStorage.setItem(STORAGE_KEYS.ADMIN_USER_EMAIL, credential.user.email || cleanEmail);
+  return credential.user;
+}
+
+/**
+ * Sign in with Google (Admin Whitelist Enforced)
+ */
+export async function loginWithGoogle(): Promise<User> {
+  if (!auth) {
+    throw new Error('Firebase is not configured.');
+  }
+
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+
+  const credential = await signInWithPopup(auth, provider);
+  const cleanEmail = credential.user.email?.trim().toLowerCase() || '';
+
+  if (!isAuthorizedAdminEmail(cleanEmail)) {
+    await firebaseSignOut(auth);
+    throw new Error(`Unauthorized: "${cleanEmail}" is not an authorized administrator email.`);
+  }
+
+  localStorage.setItem('flipbook_admin_authenticated', 'true');
+  localStorage.setItem(STORAGE_KEYS.ADMIN_USER_EMAIL, cleanEmail);
   return credential.user;
 }
 
