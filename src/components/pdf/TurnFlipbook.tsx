@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef, us
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { PdfPageCanvas } from './PdfPageCanvas';
 import { playPageTurnSound } from '../../lib/pageAudio';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export interface TurnFlipbookHandle {
   flipNext: () => void;
@@ -47,7 +46,6 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
     }, []);
 
     // Determine left and right page numbers in book spread
-    // Page 1 is the front cover (single right page on desktop, single page on mobile)
     let leftPageNum: number | null = null;
     let rightPageNum: number | null = null;
 
@@ -77,7 +75,7 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
         setTimeout(() => {
           onPageChange(nextP);
           setIsFlipping(null);
-        }, 320);
+        }, 360);
       }
     }, [isFlipping, isMobile, currentPage, totalPages, onPageChange]);
 
@@ -91,7 +89,7 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
         setTimeout(() => {
           onPageChange(prevP);
           setIsFlipping(null);
-        }, 320);
+        }, 360);
       }
     }, [isFlipping, isMobile, currentPage, onPageChange]);
 
@@ -114,7 +112,7 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
     // Keyboard Arrow Navigation
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
           goToNext();
         } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
           goToPrev();
@@ -135,7 +133,7 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
       if (e.changedTouches.length === 1) {
         const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
         const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
-        if (Math.abs(deltaX) > 40 && deltaY < 80) {
+        if (Math.abs(deltaX) > 35 && deltaY < 90) {
           if (deltaX < 0) {
             goToNext();
           } else {
@@ -152,37 +150,22 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
         onTouchEnd={handleTouchEnd}
         className="relative w-full h-full flex items-center justify-center select-none overflow-visible p-2 sm:p-6 perspective-2000"
       >
-        {/* Previous Page Navigation Button */}
-        {currentPage > 1 && (
-          <button
-            onClick={goToPrev}
-            className="absolute left-2 sm:left-6 z-30 p-2.5 sm:p-3.5 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/80 shadow-2xl backdrop-blur-md transition-all hover:scale-105 active:scale-95 group"
-            title="Previous Page (Left Arrow)"
-          >
-            <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 group-hover:-translate-x-0.5 transition-transform" />
-          </button>
-        )}
-
         {/* 3D Book Spread Shell */}
         <div
-          className={`relative flex items-center justify-center transition-transform duration-300 ${
-            isFlipping === 'forward'
-              ? 'scale-[0.99] rotate-y-[-2deg]'
-              : isFlipping === 'backward'
-              ? 'scale-[0.99] rotate-y-[2deg]'
-              : 'scale-100'
-          }`}
+          className="relative flex items-center justify-center transition-all duration-300"
           style={{ transformStyle: 'preserve-3d' }}
         >
           {/* Left Page (Desktop Spread) */}
           {!isMobile && (
             <div
-              className={`relative bg-white shadow-2xl overflow-hidden transition-all duration-300 rounded-l-md border-r border-slate-200/50 ${
-                leftPageNum ? 'opacity-100' : 'opacity-0 pointer-events-none'
-              }`}
+              onClick={currentPage > 1 ? goToPrev : undefined}
+              className={`relative bg-white shadow-2xl overflow-hidden transition-all duration-300 rounded-l-md border-r border-slate-200/50 group ${
+                leftPageNum ? 'opacity-100 cursor-pointer' : 'opacity-0 pointer-events-none'
+              } ${isFlipping === 'backward' ? 'page-flip-animate-backward' : ''}`}
               style={{
-                boxShadow: leftPageNum ? '-12px 18px 35px -8px rgba(0, 0, 0, 0.65)' : 'none',
+                boxShadow: leftPageNum ? '-14px 20px 40px -8px rgba(0, 0, 0, 0.7)' : 'none',
               }}
+              title={leftPageNum ? 'Click to flip backward' : undefined}
             >
               {leftPageNum ? (
                 <>
@@ -194,7 +177,9 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
                     onPageLoaded={onDimensionsLoaded}
                   />
                   {/* Spine Depth Lighting Gradient */}
-                  <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-black/25 via-black/5 to-transparent pointer-events-none" />
+                  <div className="absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-black/30 via-black/5 to-transparent pointer-events-none" />
+                  {/* Subtle Corner Turn Cue on Hover */}
+                  <div className="page-corner-curl-left opacity-0 group-hover:opacity-100 transition-opacity" />
                 </>
               ) : (
                 <div
@@ -209,19 +194,23 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
 
           {/* Center Book Spine Divider on Spreads */}
           {!isMobile && leftPageNum && rightPageNum && (
-            <div className="w-[2px] self-stretch bg-slate-400/40 z-20 shadow-md" />
+            <div className="w-[3px] self-stretch bg-slate-500/30 z-20 shadow-md" />
           )}
 
           {/* Right Page (Desktop & Mobile Single View) */}
           <div
-            className={`relative bg-white shadow-2xl overflow-hidden transition-all duration-300 ${
+            onClick={currentPage < totalPages ? goToNext : undefined}
+            className={`relative bg-white shadow-2xl overflow-hidden transition-all duration-300 group ${
               isMobile ? 'rounded-md shadow-2xl' : 'rounded-r-md'
-            } ${rightPageNum ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            } ${rightPageNum ? 'opacity-100 cursor-pointer' : 'opacity-0 pointer-events-none'} ${
+              isFlipping === 'forward' ? 'page-flip-animate-forward' : ''
+            }`}
             style={{
               boxShadow: isMobile
-                ? '0 20px 40px -10px rgba(0, 0, 0, 0.7)'
-                : '12px 18px 35px -8px rgba(0, 0, 0, 0.65)',
+                ? '0 25px 50px -12px rgba(0, 0, 0, 0.8)'
+                : '14px 20px 40px -8px rgba(0, 0, 0, 0.7)',
             }}
+            title={rightPageNum && currentPage < totalPages ? 'Click to flip forward' : undefined}
           >
             {rightPageNum ? (
               <>
@@ -234,7 +223,11 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
                 />
                 {/* Spine Depth Lighting Gradient on Desktop */}
                 {!isMobile && (
-                  <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-black/25 via-black/5 to-transparent pointer-events-none" />
+                  <div className="absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-black/30 via-black/5 to-transparent pointer-events-none" />
+                )}
+                {/* Corner Turn Cue on Hover / Tap */}
+                {currentPage < totalPages && (
+                  <div className="page-corner-curl-right opacity-40 group-hover:opacity-100 transition-opacity" />
                 )}
               </>
             ) : (
@@ -247,17 +240,6 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
             )}
           </div>
         </div>
-
-        {/* Next Page Navigation Button */}
-        {currentPage < totalPages && (
-          <button
-            onClick={goToNext}
-            className="absolute right-2 sm:right-6 z-30 p-2.5 sm:p-3.5 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/80 shadow-2xl backdrop-blur-md transition-all hover:scale-105 active:scale-95 group"
-            title="Next Page (Right Arrow)"
-          >
-            <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-0.5 transition-transform" />
-          </button>
-        )}
       </div>
     );
   }
