@@ -158,10 +158,10 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
         maxWidth: 1200,
         minHeight: 380,
         maxHeight: 1600,
-        maxShadowOpacity: 0.55,
+        maxShadowOpacity: 0.5,
         showCover: true,
         mobileScrollSupport: false,
-        flippingTime: 650,
+        flippingTime: 600,
         usePortrait: isMobileScreen,
         startPage: Math.max(0, Math.min(currentPage - 1, totalPages - 1)),
         drawShadow: true,
@@ -170,14 +170,22 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
         showPageCorners: true,
       });
 
-      const pageElements = bookEl.querySelectorAll<HTMLElement>('.turn-page-item');
+      const pageElements = bookEl.querySelectorAll<HTMLElement>('.page');
       if (pageElements.length > 0) {
         pageFlip.loadFromHTML(pageElements);
         pageFlipInstanceRef.current = pageFlip;
         setIsInitialized(true);
 
-        // Initial render of first few pages
+        // Pre-render visible pages
         renderSurroundingPages(currentPage);
+
+        // Eagerly render all remaining pages in background
+        for (let p = 1; p <= totalPages; p++) {
+          const canvas = document.getElementById(`flip-canvas-${p}`) as HTMLCanvasElement;
+          if (canvas) {
+            renderPdfCanvas(canvas, p);
+          }
+        }
 
         // Event listeners
         pageFlip.on('flip', (e: any) => {
@@ -203,7 +211,7 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
           pageFlipInstanceRef.current = null;
         }
       };
-    }, [pdfDocument, displayWidth, displayHeight, totalPages]);
+    }, [pdfDocument, displayWidth, displayHeight, totalPages, renderPdfCanvas, renderSurroundingPages, onPageChange, currentPage]);
 
     // Update surrounding canvas renders when currentPage changes from external control
     useEffect(() => {
@@ -225,32 +233,35 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
             height: `${displayHeight}px`,
           }}
         >
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
-            const isHardCover = pageNum === 1 || pageNum === totalPages;
-            return (
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
+            <div
+              key={pageNum}
+              className="page bg-white overflow-hidden"
+              data-density="soft"
+              style={{
+                width: `${displayWidth}px`,
+                height: `${displayHeight}px`,
+                backgroundColor: '#ffffff',
+              }}
+            >
               <div
-                key={pageNum}
-                className="turn-page-item bg-white overflow-hidden shadow-md"
-                data-density={isHardCover ? 'hard' : 'soft'}
+                className="page-content relative w-full h-full flex items-center justify-center bg-white overflow-hidden"
                 style={{
                   width: `${displayWidth}px`,
                   height: `${displayHeight}px`,
-                  backgroundColor: '#ffffff',
                 }}
               >
-                <div className="relative w-full h-full flex items-center justify-center bg-white overflow-hidden">
-                  <canvas
-                    id={`flip-canvas-${pageNum}`}
-                    className="block"
-                    style={{
-                      width: `${displayWidth}px`,
-                      height: `${displayHeight}px`,
-                    }}
-                  />
-                </div>
+                <canvas
+                  id={`flip-canvas-${pageNum}`}
+                  className="block bg-white"
+                  style={{
+                    width: `${displayWidth}px`,
+                    height: `${displayHeight}px`,
+                  }}
+                />
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       </div>
     );
