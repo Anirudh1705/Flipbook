@@ -122,9 +122,6 @@ export const PdfToolbar: React.FC<PdfToolbarProps> = ({
             <h1 className="text-xs sm:text-sm font-bold text-slate-100 truncate max-w-[180px] sm:max-w-md">
               {book.title}
             </h1>
-            <p className="text-[10px] text-slate-400 font-mono hidden sm:block truncate">
-              {book.author ? `By ${book.author}` : book.category}
-            </p>
           </div>
         </div>
 
