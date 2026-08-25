@@ -6,9 +6,7 @@ import { TurnFlipbook, type TurnFlipbookHandle } from './TurnFlipbook';
 import { PdfToolbar } from './PdfToolbar';
 import { PdfThumbnails } from './PdfThumbnails';
 import { PdfSearchModal } from './PdfSearchModal';
-import { ResumePrompt } from './ResumePrompt';
 import { usePdfSearch } from '../../hooks/usePdfSearch';
-import { useReadingProgress } from '../../hooks/useReadingProgress';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface FlipbookViewerProps {
@@ -39,11 +37,10 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
   // Touch gesture tracking for swipe & pinch in flipbook mode
   const touchStartRef = useRef<{ x: number; y: number; dist: number }>({ x: 0, y: 0, dist: 0 });
 
-  // Custom hooks for search and reading memory
+  // Custom hooks for search
   const search = usePdfSearch(pdfDocument);
-  const { savedProgress, updateProgress, dismissPrompt } = useReadingProgress(book.slug);
 
-  // Detect mobile screen & adjust spread mode
+  // Responsive mobile detection
   useEffect(() => {
     const checkMobile = () => {
       const mobile = window.innerWidth < 768;
@@ -56,11 +53,6 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-
-  // Sync reading progress
-  useEffect(() => {
-    updateProgress(currentPage, totalPages);
-  }, [currentPage, totalPages, updateProgress]);
 
   // Precision Fit Scale Calculations (Fit Page & Fit Width)
   const calculateFitScale = useCallback(
@@ -245,18 +237,6 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
       onTouchEnd={handleTouchEnd}
       className="relative w-full h-screen bg-slate-950 text-slate-100 select-none overflow-hidden flex flex-col justify-between"
     >
-      {/* Resume Progress Toast */}
-      {savedProgress && (
-        <ResumePrompt
-          progress={savedProgress}
-          onResume={page => {
-            handleGoToPage(page);
-            dismissPrompt();
-          }}
-          onDismiss={dismissPrompt}
-        />
-      )}
-
       {/* Top and Bottom Controls Toolbar */}
       <PdfToolbar
         book={book}
