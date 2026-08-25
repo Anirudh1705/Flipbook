@@ -37,9 +37,6 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
     height: 842,
   });
 
-  // Touch gesture tracking for swipe & pinch in flipbook mode
-  const touchStartRef = useRef<{ x: number; y: number; dist: number }>({ x: 0, y: 0, dist: 0 });
-
   // Custom hooks for search
   const search = usePdfSearch(pdfDocument);
 
@@ -63,10 +60,14 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
       const container = containerRef.current;
       if (!container || baseDimensions.width === 0 || baseDimensions.height === 0) return;
 
-      const availWidth = Math.max(300, container.clientWidth - 48);
-      const availHeight = Math.max(300, container.clientHeight - 130);
+      const availWidth = Math.max(280, container.clientWidth - (isMobile ? 12 : 48));
+      const availHeight = Math.max(300, container.clientHeight - (isMobile ? 100 : 130));
 
-      if (viewMode === 'scroll') {
+      if (isMobile) {
+        // On mobile, automatically fit to available screen width for instant readability
+        const optimal = availWidth / baseDimensions.width;
+        setScale(Math.max(0.3, Math.min(1.2, Number(optimal.toFixed(2)))));
+      } else {
         if (mode === 'page') {
           const fitH = (availHeight - 20) / baseDimensions.height;
           const fitW = (availWidth - 20) / baseDimensions.width;
@@ -77,23 +78,9 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
           const optimal = targetColWidth / baseDimensions.width;
           setScale(Math.max(0.4, Math.min(1.55, Number(optimal.toFixed(2)))));
         }
-      } else {
-        const isDouble = spreadMode === 'double' && !isMobile;
-        const targetWidth = isDouble ? baseDimensions.width * 2 : baseDimensions.width;
-        const targetHeight = baseDimensions.height;
-
-        if (mode === 'page') {
-          const scaleH = (availHeight - (isMobile ? 12 : 24)) / targetHeight;
-          const scaleW = (availWidth - (isMobile ? 12 : 32)) / targetWidth;
-          const optimal = Math.min(scaleH, scaleW, isMobile ? 1.05 : 1.2);
-          setScale(Math.max(0.3, Number(optimal.toFixed(2))));
-        } else {
-          const optimal = (availWidth - (isMobile ? 12 : 32)) / targetWidth;
-          setScale(Math.max(0.3, Math.min(isMobile ? 1.15 : 1.4, Number(optimal.toFixed(2)))));
-        }
       }
     },
-    [viewMode, spreadMode, isMobile, baseDimensions]
+    [isMobile, baseDimensions]
   );
 
   // Initial fit on load
@@ -193,40 +180,10 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleNextPage, handlePrevPage]);
 
-  // Touch Swipe for Flipbook mode
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (viewMode === 'scroll') return;
-    if (e.touches.length === 1) {
-      touchStartRef.current = {
-        x: e.touches[0].clientX,
-        y: e.touches[0].clientY,
-        dist: 0,
-      };
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (viewMode === 'scroll') return;
-    if (e.changedTouches.length === 1) {
-      const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
-      const deltaY = e.changedTouches[0].clientY - touchStartRef.current.y;
-
-      if (Math.abs(deltaX) > 50 && Math.abs(deltaY) < 60) {
-        if (deltaX < 0) {
-          handleNextPage();
-        } else {
-          handlePrevPage();
-        }
-      }
-    }
-  };
-
   return (
     <div
       ref={containerRef}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      className="relative w-full h-screen bg-slate-950 text-slate-100 select-none overflow-hidden flex flex-col justify-between"
+      className="relative w-full h-[100dvh] bg-slate-950 text-slate-100 overflow-hidden flex flex-col justify-between"
     >
       {/* Top and Bottom Controls Toolbar */}
       <PdfToolbar
@@ -284,12 +241,17 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
         onGoToPage={handleGoToPage}
       />
 
-      {/* Main Continuous Document Stage */}
+      {/* Main Continuous Document Stage with Native Touch Scrolling */}
       <main
         ref={scrollContainerRef}
-        className="flex-1 w-full overflow-y-auto overflow-x-auto pt-16 pb-24 px-2 sm:px-4 scrollbar-thin flex justify-center"
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          overscrollBehaviorY: 'contain',
+        }}
+        className="flex-1 w-full overflow-y-auto overflow-x-hidden pt-16 pb-24 px-1 sm:px-4 scrollbar-thin flex justify-center touch-pan-y"
       >
-        <div className="min-w-fit w-full flex flex-col items-center mx-auto my-4 max-w-fit shadow-2xl rounded-xl overflow-hidden border border-slate-800/80 bg-white">
+        <div className="w-full flex flex-col items-center mx-auto my-2 sm:my-4 max-w-full sm:max-w-fit shadow-2xl rounded-lg sm:rounded-xl overflow-hidden border border-slate-800/80 bg-white">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
             <PdfScrollPage
               key={pageNum}
