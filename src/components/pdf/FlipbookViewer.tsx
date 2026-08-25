@@ -2,12 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { Book } from '../../types/book';
 import { PdfScrollPage } from './PdfScrollPage';
-import { TurnFlipbook, type TurnFlipbookHandle } from './TurnFlipbook';
 import { PdfToolbar } from './PdfToolbar';
 import { PdfThumbnails } from './PdfThumbnails';
 import { PdfSearchModal } from './PdfSearchModal';
 import { usePdfSearch } from '../../hooks/usePdfSearch';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface FlipbookViewerProps {
   book: Book;
@@ -17,15 +15,12 @@ interface FlipbookViewerProps {
 export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocument }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const turnFlipbookRef = useRef<TurnFlipbookHandle | null>(null);
   const totalPages = pdfDocument.numPages;
 
-  // Viewport & Layout state - Defaults to interactive 3D Flipbook mode
+  // Viewport & Layout state - Continuous high-performance document reader
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
-  const [spreadMode, setSpreadMode] = useState<'single' | 'double'>(() =>
-    typeof window !== 'undefined' && window.innerWidth < 768 ? 'single' : 'double'
-  );
+  const [spreadMode, setSpreadMode] = useState<'single' | 'double'>('single');
   const [scale, setScale] = useState<number>(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       const availWidth = window.innerWidth - 24;
@@ -33,7 +28,7 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
     }
     return 1.0;
   });
-  const [viewMode, setViewMode] = useState<'scroll' | 'flipbook'>('flipbook');
+  const [viewMode, setViewMode] = useState<'scroll' | 'flipbook'>('scroll');
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showThumbnails, setShowThumbnails] = useState<boolean>(false);
   const [showSearch, setShowSearch] = useState<boolean>(false);
@@ -122,32 +117,20 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
   const handleGoToPage = (page: number) => {
     const clamped = Math.max(1, Math.min(page, totalPages));
     setCurrentPage(clamped);
-    if (viewMode === 'scroll') {
-      scrollToPage(clamped);
-    } else {
-      turnFlipbookRef.current?.flipToPage(clamped);
-    }
+    scrollToPage(clamped);
   };
 
   const handleNextPage = useCallback(() => {
-    if (viewMode === 'scroll') {
-      const next = Math.min(currentPage + 1, totalPages);
-      setCurrentPage(next);
-      scrollToPage(next);
-    } else {
-      turnFlipbookRef.current?.flipNext();
-    }
-  }, [viewMode, currentPage, totalPages]);
+    const next = Math.min(currentPage + 1, totalPages);
+    setCurrentPage(next);
+    scrollToPage(next);
+  }, [currentPage, totalPages]);
 
   const handlePrevPage = useCallback(() => {
-    if (viewMode === 'scroll') {
-      const prev = Math.max(currentPage - 1, 1);
-      setCurrentPage(prev);
-      scrollToPage(prev);
-    } else {
-      turnFlipbookRef.current?.flipPrev();
-    }
-  }, [viewMode, currentPage]);
+    const prev = Math.max(currentPage - 1, 1);
+    setCurrentPage(prev);
+    scrollToPage(prev);
+  }, [currentPage]);
 
   const handleFirstPage = () => handleGoToPage(1);
   const handleLastPage = () => handleGoToPage(totalPages);
@@ -301,60 +284,25 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
         onGoToPage={handleGoToPage}
       />
 
-      {/* Main Viewport Stage */}
-      {viewMode === 'scroll' ? (
-        /* 1. CONTINUOUS VERTICAL SCROLL MODE */
-        <main
-          ref={scrollContainerRef}
-          className="flex-1 w-full overflow-y-auto overflow-x-auto pt-16 pb-24 px-4 scrollbar-thin"
-        >
-          <div className="min-w-fit w-full flex flex-col items-center mx-auto my-4 max-w-fit shadow-2xl rounded-xl overflow-hidden border border-slate-800/80 bg-white">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
-              <PdfScrollPage
-                key={pageNum}
-                pdfDocument={pdfDocument}
-                pageNumber={pageNum}
-                scale={scale}
-                baseDimensions={baseDimensions}
-                onVisible={p => setCurrentPage(p)}
-                onDimensionsLoaded={dims => setBaseDimensions(dims)}
-              />
-            ))}
-          </div>
-        </main>
-      ) : (
-        /* 2. TURN.JS PHYSICS-BASED 3D FLIPBOOK MODE */
-        <main className="flex-1 w-full overflow-hidden flex items-center justify-center p-2 sm:p-6 pt-16 pb-20 relative">
-          <button
-            onClick={handlePrevPage}
-            disabled={currentPage <= 1}
-            className="hidden lg:flex absolute left-4 z-30 w-12 h-12 rounded-2xl bg-slate-900/80 hover:bg-brand-500 text-slate-300 hover:text-slate-950 items-center justify-center border border-slate-800 backdrop-blur-md shadow-xl disabled:opacity-0 disabled:pointer-events-none transition-all hover:scale-105 active:scale-95"
-            title="Previous Page (Left Arrow)"
-          >
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-
-          <button
-            onClick={handleNextPage}
-            disabled={currentPage >= totalPages}
-            className="hidden lg:flex absolute right-4 z-30 w-12 h-12 rounded-2xl bg-slate-900/80 hover:bg-brand-500 text-slate-300 hover:text-slate-950 items-center justify-center border border-slate-800 backdrop-blur-md shadow-xl disabled:opacity-0 disabled:pointer-events-none transition-all hover:scale-105 active:scale-95"
-            title="Next Page (Right Arrow / Space)"
-          >
-            <ChevronRight className="w-6 h-6" />
-          </button>
-
-          <TurnFlipbook
-            ref={turnFlipbookRef}
-            pdfDocument={pdfDocument}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            scale={scale}
-            baseDimensions={baseDimensions}
-            onPageChange={newPage => setCurrentPage(newPage)}
-            onDimensionsLoaded={dims => setBaseDimensions(dims)}
-          />
-        </main>
-      )}
+      {/* Main Continuous Document Stage */}
+      <main
+        ref={scrollContainerRef}
+        className="flex-1 w-full overflow-y-auto overflow-x-auto pt-16 pb-24 px-2 sm:px-4 scrollbar-thin flex justify-center"
+      >
+        <div className="min-w-fit w-full flex flex-col items-center mx-auto my-4 max-w-fit shadow-2xl rounded-xl overflow-hidden border border-slate-800/80 bg-white">
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
+            <PdfScrollPage
+              key={pageNum}
+              pdfDocument={pdfDocument}
+              pageNumber={pageNum}
+              scale={scale}
+              baseDimensions={baseDimensions}
+              onVisible={p => setCurrentPage(p)}
+              onDimensionsLoaded={dims => setBaseDimensions(dims)}
+            />
+          ))}
+        </div>
+      </main>
     </div>
   );
 };
