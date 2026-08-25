@@ -87,10 +87,10 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
             onPageLoaded({ width: rawW, height: rawH });
           }
 
-          // Calculate display size for book based on container size
+          // Calculate display size for book based on container size (maximize screen usage)
           const stageEl = stageContainerRef.current;
-          const stageW = stageEl ? stageEl.clientWidth - 40 : window.innerWidth - 40;
-          const stageH = stageEl ? stageEl.clientHeight - 40 : window.innerHeight - 140;
+          const stageW = stageEl ? stageEl.clientWidth - 16 : window.innerWidth - 16;
+          const stageH = stageEl ? stageEl.clientHeight - 16 : window.innerHeight - 80;
 
           const isLandscapePdf = rawW >= rawH;
           const isMobile = window.innerWidth < 768;
@@ -100,25 +100,25 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
 
           if (isMobile) {
             // Full mobile width fill (100% of mobile screen width, zero waste!)
-            targetPageW = Math.min(window.innerWidth - 8, 480);
+            targetPageW = Math.min(window.innerWidth - 8, 540);
             targetPageH = Math.round((rawH / rawW) * targetPageW);
           } else if (isLandscapePdf) {
-            // Desktop landscape slide
-            const fitW = (stageW - 20) / rawW;
-            const fitH = (stageH - 20) / rawH;
-            const fit = Math.min(fitW, fitH, 1.5);
+            // Desktop landscape slide: fill max available stage
+            const fitW = (stageW - 16) / rawW;
+            const fitH = (stageH - 16) / rawH;
+            const fit = Math.min(fitW, fitH, 2.0);
             targetPageW = Math.round(rawW * fit);
             targetPageH = Math.round(rawH * fit);
           } else {
-            // Dual spread fitting on desktop (two pages side by side)
-            const fitW = (stageW - 30) / (rawW * 2);
-            const fitH = (stageH - 20) / rawH;
-            const fit = Math.min(fitW, fitH, 1.5);
+            // Dual spread fitting on desktop: maximize height & width to fill monitor!
+            const fitW = (stageW - 24) / (rawW * 2);
+            const fitH = (stageH - 16) / rawH;
+            const fit = Math.min(fitW, fitH, 2.0);
             targetPageW = Math.round(rawW * fit);
             targetPageH = Math.round(rawH * fit);
           }
 
-          setBookSize({ width: Math.max(300, targetPageW), height: Math.max(400, targetPageH) });
+          setBookSize({ width: Math.max(320, targetPageW), height: Math.max(450, targetPageH) });
 
           const renderedUrls: string[] = [];
           // Ultra-high DPI scale for crystal clear, razor-sharp text and graphics

@@ -49,27 +49,28 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
         const optimal = screenW / baseDimensions.width;
         setScale(Number(optimal.toFixed(3)));
       } else {
-        const availWidth = Math.max(280, container.clientWidth - 48);
-        const targetColWidth = Math.min(availWidth, 960);
+        // Desktop scroll: wide comfortable document column up to 1200px
+        const availWidth = Math.max(300, container.clientWidth - 32);
+        const targetColWidth = Math.min(availWidth, 1200);
         const optimal = targetColWidth / baseDimensions.width;
-        setScale(Math.max(0.4, Math.min(1.5, Number(optimal.toFixed(3)))));
+        setScale(Math.max(0.6, Math.min(2.0, Number(optimal.toFixed(3)))));
       }
     } else {
-      // 3D Flipbook mode
-      const availWidth = Math.max(280, container.clientWidth - (isMobileView ? 8 : 64));
-      const availHeight = Math.max(300, container.clientHeight - (isMobileView ? 70 : 140));
+      // 3D Flipbook mode: maximize viewport height & width to fill the screen
+      const availWidth = Math.max(280, container.clientWidth - (isMobileView ? 8 : 32));
+      const availHeight = Math.max(300, container.clientHeight - (isMobileView ? 60 : 70));
 
       if (isMobileView || spreadMode === 'single') {
         const fitW = availWidth / baseDimensions.width;
         const fitH = availHeight / baseDimensions.height;
-        const optimal = Math.min(fitW, fitH, 1.3);
+        const optimal = Math.min(fitW, fitH, 2.0);
         setScale(Math.max(0.5, Number(optimal.toFixed(3))));
       } else {
         // 2-page spread on desktop
         const fitW = availWidth / (baseDimensions.width * 2);
         const fitH = availHeight / baseDimensions.height;
-        const optimal = Math.min(fitW, fitH, 1.4);
-        setScale(Math.max(0.4, Number(optimal.toFixed(3))));
+        const optimal = Math.min(fitW, fitH, 2.0);
+        setScale(Math.max(0.5, Number(optimal.toFixed(3))));
       }
     }
   }, [baseDimensions, viewMode, spreadMode]);
@@ -270,7 +271,7 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
 
       {/* Stage: 3D Flipbook or Continuous Vertical Scroll */}
       {viewMode === 'flipbook' ? (
-        <main className="flex-1 min-h-0 w-full h-full relative flex items-center justify-center pt-14 pb-16 sm:pb-20 overflow-hidden">
+        <main className="flex-1 min-h-0 w-full h-full relative flex items-center justify-center pt-12 sm:pt-14 pb-12 sm:pb-16 overflow-hidden">
           <StPageFlipBook
             ref={pageFlipRef}
             pdfDocument={pdfDocument}
@@ -292,9 +293,9 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
             touchAction: 'pan-y',
             overscrollBehaviorY: 'contain',
           }}
-          className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden pt-14 sm:pt-14 pb-0 px-0 flex justify-center bg-slate-950"
+          className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden pt-12 sm:pt-14 pb-0 px-0 flex justify-center bg-slate-950"
         >
-          <div className="w-full flex flex-col items-center mx-auto py-0 my-0 max-w-5xl space-y-0 shadow-2xl">
+          <div className="w-full flex flex-col items-center mx-auto py-0 my-0 max-w-full sm:max-w-6xl space-y-0 shadow-2xl">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
               <PdfScrollPage
                 key={pageNum}
