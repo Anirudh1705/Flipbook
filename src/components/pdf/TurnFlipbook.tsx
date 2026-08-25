@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from 'react';
+import { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { PdfPageCanvas } from './PdfPageCanvas';
+import { PageFlip } from 'page-flip';
 import { playPageTurnSound } from '../../lib/pageAudio';
+import { Loader2 } from 'lucide-react';
 
 export interface TurnFlipbookHandle {
   flipNext: () => void;
@@ -25,220 +26,301 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
       pdfDocument,
       currentPage,
       totalPages,
-      scale,
-      baseDimensions,
       onPageChange,
       onDimensionsLoaded,
     },
     ref
   ) => {
-    const containerRef = useRef<HTMLDivElement | null>(null);
-    const [isFlipping, setIsFlipping] = useState<'forward' | 'backward' | null>(null);
-    const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
+    const bookContainerRef = useRef<HTMLDivElement | null>(null);
+    const pageFlipInstanceRef = useRef<PageFlip | null>(null);
+    const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
+    const renderingPages = useRef<Set<number>>(new Set());
+    const renderedPages = useRef<Set<number>>(new Set());
 
-    // Responsive mobile detector
-    useEffect(() => {
-      const handleResize = () => {
-        setIsMobile(window.innerWidth < 768);
-      };
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
-    }, []);
+    const [isReady, setIsReady] = useState(false);
+    const [aspectDimensions, setAspectDimensions] = useState<{ width: number; height: number }>({
+      width: 595,
+      height: 842,
+    });
 
-    // Determine left and right page numbers in book spread
-    let leftPageNum: number | null = null;
-    let rightPageNum: number | null = null;
-
-    if (isMobile) {
-      rightPageNum = currentPage;
-    } else {
-      if (currentPage === 1) {
-        leftPageNum = null;
-        rightPageNum = 1;
-      } else if (currentPage >= totalPages && totalPages % 2 === 0) {
-        leftPageNum = totalPages;
-        rightPageNum = null;
-      } else {
-        const evenLeft = currentPage % 2 === 0 ? currentPage : currentPage - 1;
-        leftPageNum = evenLeft <= totalPages ? evenLeft : null;
-        rightPageNum = evenLeft + 1 <= totalPages ? evenLeft + 1 : null;
-      }
-    }
-
-    const goToNext = useCallback(() => {
-      if (isFlipping) return;
-      const step = isMobile || currentPage === 1 ? 1 : 2;
-      const nextP = Math.min(totalPages, currentPage + step);
-      if (nextP !== currentPage) {
-        setIsFlipping('forward');
-        playPageTurnSound();
-        setTimeout(() => {
-          onPageChange(nextP);
-          setIsFlipping(null);
-        }, 360);
-      }
-    }, [isFlipping, isMobile, currentPage, totalPages, onPageChange]);
-
-    const goToPrev = useCallback(() => {
-      if (isFlipping) return;
-      const step = isMobile || currentPage <= 2 ? 1 : 2;
-      const prevP = Math.max(1, currentPage - step);
-      if (prevP !== currentPage) {
-        setIsFlipping('backward');
-        playPageTurnSound();
-        setTimeout(() => {
-          onPageChange(prevP);
-          setIsFlipping(null);
-        }, 360);
-      }
-    }, [isFlipping, isMobile, currentPage, onPageChange]);
-
-    // Expose control methods to parent toolbar
+    // Expose control methods to parent (Toolbar & Shortcuts)
     useImperativeHandle(
       ref,
       () => ({
-        flipNext: goToNext,
-        flipPrev: goToPrev,
+        flipNext: () => {
+          if (pageFlipInstanceRef.current) {
+            pageFlipInstanceRef.current.flipNext('top');
+          }
+        },
+        flipPrev: () => {
+          if (pageFlipInstanceRef.current) {
+            pageFlipInstanceRef.current.flipPrev('top');
+          }
+        },
         flipToPage: (page: number) => {
-          if (page >= 1 && page <= totalPages && page !== currentPage) {
-            playPageTurnSound();
-            onPageChange(page);
+          if (pageFlipInstanceRef.current && page >= 1 && page <= totalPages) {
+            pageFlipInstanceRef.current.turnToPage(page - 1);
           }
         },
       }),
-      [goToNext, goToPrev, totalPages, currentPage, onPageChange]
+      [totalPages]
     );
 
-    // Keyboard Arrow Navigation
+    // Render an individual PDF page directly to its canvas
+    const renderPageToCanvas = useCallback(
+      async (pageNum: number) => {
+        if (!pdfDocument || pageNum < 1 || pageNum > totalPages) return;
+        if (renderingPages.current.has(pageNum) || renderedPages.current.has(pageNum)) return;
+
+        const canvas = canvasRefs.current.get(pageNum);
+        if (!canvas) return;
+
+        renderingPages.current.add(pageNum);
+
+        try {
+          const page = await pdfDocument.getPage(pageNum);
+
+          // Crisp 1.5x resolution for silky performance and sharp text
+          const dpr = Math.min(window.devicePixelRatio || 1, 2);
+          const renderScale = 1.5 * dpr;
+          const viewport = page.getViewport({ scale: renderScale });
+
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+
+          const ctx = canvas.getContext('2d', { alpha: false });
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
+            await page.render({
+              canvasContext: ctx,
+              viewport: viewport,
+              intent: 'display',
+              canvas: canvas,
+            }).promise;
+
+            renderedPages.current.add(pageNum);
+          }
+        } catch (err) {
+          console.warn(`Failed rendering page ${pageNum}:`, err);
+        } finally {
+          renderingPages.current.delete(pageNum);
+        }
+      },
+      [pdfDocument, totalPages]
+    );
+
+    // 1. Initial aspect ratio & dimensions extraction
+    useEffect(() => {
+      let isMounted = true;
+
+      const initDimensions = async () => {
+        try {
+          const firstPage = await pdfDocument.getPage(1);
+          const vp = firstPage.getViewport({ scale: 1.0 });
+          if (isMounted) {
+            const dims = { width: Math.round(vp.width), height: Math.round(vp.height) };
+            setAspectDimensions(dims);
+            onDimensionsLoaded?.(dims);
+          }
+        } catch (err) {
+          console.error('Failed reading page 1 dimensions:', err);
+        }
+      };
+
+      initDimensions();
+
+      return () => {
+        isMounted = false;
+      };
+    }, [pdfDocument, onDimensionsLoaded]);
+
+    // 2. Initialize StPageFlip once container and canvases are mounted
+    useEffect(() => {
+      if (!bookContainerRef.current || !pdfDocument || totalPages === 0) return;
+
+      let isMounted = true;
+      renderedPages.current.clear();
+      renderingPages.current.clear();
+
+      // Pre-render first 4 pages immediately for instantaneous visual feedback
+      const initialBatch = [1, 2, 3, 4].filter((p) => p <= totalPages);
+      Promise.all(initialBatch.map((p) => renderPageToCanvas(p))).then(() => {
+        if (!isMounted || !bookContainerRef.current) return;
+
+        try {
+          // Destroy any existing instance
+          if (pageFlipInstanceRef.current) {
+            pageFlipInstanceRef.current.destroy();
+            pageFlipInstanceRef.current = null;
+          }
+
+          const isMobileView = window.innerWidth < 768;
+          const containerWidth = bookContainerRef.current.parentElement?.clientWidth || window.innerWidth;
+          const containerHeight = bookContainerRef.current.parentElement?.clientHeight || (window.innerHeight - 120);
+
+          // Calculate fitted base page size
+          const maxSingleWidth = isMobileView ? containerWidth * 0.92 : containerWidth * 0.46;
+          const maxSingleHeight = containerHeight * 0.90;
+          const ratio = aspectDimensions.width / aspectDimensions.height;
+
+          let targetWidth = maxSingleWidth;
+          let targetHeight = targetWidth / ratio;
+
+          if (targetHeight > maxSingleHeight) {
+            targetHeight = maxSingleHeight;
+            targetWidth = targetHeight * ratio;
+          }
+
+          const pageFlip = new PageFlip(bookContainerRef.current, {
+            width: Math.round(targetWidth),
+            height: Math.round(targetHeight),
+            size: 'stretch',
+            minWidth: 280,
+            maxWidth: 1200,
+            minHeight: 380,
+            maxHeight: 1600,
+            maxShadowOpacity: 0.6,
+            showCover: true,
+            mobileScrollSupport: false,
+            usePortrait: true,
+            startPage: Math.max(0, currentPage - 1),
+            drawShadow: true,
+            flippingTime: 700, // Smooth flipping animation matching reference
+            useMouseEvents: true,
+            swipeDistance: 25,
+            showPageCorners: true,
+          });
+
+          const pageElements = bookContainerRef.current.querySelectorAll<HTMLElement>('.st-page-item');
+          if (pageElements.length > 0) {
+            pageFlip.loadFromHTML(pageElements);
+
+            pageFlip.on('flip', (e) => {
+              const targetPage = (e.data as number) + 1;
+              onPageChange(targetPage);
+              playPageTurnSound();
+
+              // Eagerly pre-render neighboring pages in background
+              const upcoming = [
+                targetPage - 2,
+                targetPage - 1,
+                targetPage,
+                targetPage + 1,
+                targetPage + 2,
+                targetPage + 3,
+              ].filter((p) => p >= 1 && p <= totalPages);
+
+              upcoming.forEach((p) => renderPageToCanvas(p));
+            });
+
+            pageFlipInstanceRef.current = pageFlip;
+            setIsReady(true);
+
+            // Render remaining upcoming pages in background idle queue
+            const renderRemaining = async () => {
+              for (let p = 5; p <= totalPages; p++) {
+                if (!isMounted) break;
+                await renderPageToCanvas(p);
+              }
+            };
+            setTimeout(renderRemaining, 300);
+          }
+        } catch (err) {
+          console.error('Error initializing PageFlip:', err);
+        }
+      });
+
+      return () => {
+        isMounted = false;
+        if (pageFlipInstanceRef.current) {
+          try {
+            pageFlipInstanceRef.current.destroy();
+          } catch (e) {
+            // ignore cleanup errors
+          }
+          pageFlipInstanceRef.current = null;
+        }
+      };
+    }, [pdfDocument, totalPages, aspectDimensions, renderPageToCanvas, onPageChange]);
+
+    // Synchronize page if changed externally (e.g. thumbnails or bottom slider)
+    useEffect(() => {
+      if (pageFlipInstanceRef.current && isReady) {
+        const currentInstancePage = pageFlipInstanceRef.current.getCurrentPageIndex() + 1;
+        if (currentInstancePage !== currentPage) {
+          pageFlipInstanceRef.current.turnToPage(currentPage - 1);
+        }
+      }
+    }, [currentPage, isReady]);
+
+    // Keyboard navigation
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
-          goToNext();
+          pageFlipInstanceRef.current?.flipNext('top');
         } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-          goToPrev();
+          pageFlipInstanceRef.current?.flipPrev('top');
         }
       };
+
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [goToNext, goToPrev]);
+    }, []);
 
-    // Touch Swipe Gesture Tracking for Mobile
-    const touchStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-    const handleTouchStart = (e: React.TouchEvent) => {
-      if (e.touches.length === 1) {
-        touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      }
-    };
-    const handleTouchEnd = (e: React.TouchEvent) => {
-      if (e.changedTouches.length === 1) {
-        const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
-        const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
-        if (Math.abs(deltaX) > 35 && deltaY < 90) {
-          if (deltaX < 0) {
-            goToNext();
-          } else {
-            goToPrev();
-          }
-        }
-      }
-    };
+    // Create list of page numbers
+    const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
 
     return (
-      <div
-        ref={containerRef}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        className="relative w-full h-full flex items-center justify-center select-none overflow-visible p-2 sm:p-6 perspective-2000"
-      >
-        {/* 3D Book Spread Shell */}
-        <div
-          className="relative flex items-center justify-center transition-all duration-300"
-          style={{ transformStyle: 'preserve-3d' }}
-        >
-          {/* Left Page (Desktop Spread) */}
-          {!isMobile && (
-            <div
-              onClick={currentPage > 1 ? goToPrev : undefined}
-              className={`relative bg-white shadow-2xl overflow-hidden transition-all duration-300 rounded-l-md border-r border-slate-200/50 group ${
-                leftPageNum ? 'opacity-100 cursor-pointer' : 'opacity-0 pointer-events-none'
-              } ${isFlipping === 'backward' ? 'page-flip-animate-backward' : ''}`}
-              style={{
-                boxShadow: leftPageNum ? '-14px 20px 40px -8px rgba(0, 0, 0, 0.7)' : 'none',
-              }}
-              title={leftPageNum ? 'Click to flip backward' : undefined}
-            >
-              {leftPageNum ? (
-                <>
-                  <PdfPageCanvas
-                    pdfDocument={pdfDocument}
-                    pageNumber={leftPageNum}
-                    scale={scale}
-                    side="left"
-                    onPageLoaded={onDimensionsLoaded}
-                  />
-                  {/* Spine Depth Lighting Gradient */}
-                  <div className="absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-black/30 via-black/5 to-transparent pointer-events-none" />
-                  {/* Subtle Corner Turn Cue on Hover */}
-                  <div className="page-corner-curl-left opacity-0 group-hover:opacity-100 transition-opacity" />
-                </>
-              ) : (
-                <div
-                  style={{
-                    width: `${Math.floor(baseDimensions.width * scale)}px`,
-                    height: `${Math.floor(baseDimensions.height * scale)}px`,
-                  }}
-                />
-              )}
-            </div>
-          )}
-
-          {/* Center Book Spine Divider on Spreads */}
-          {!isMobile && leftPageNum && rightPageNum && (
-            <div className="w-[3px] self-stretch bg-slate-500/30 z-20 shadow-md" />
-          )}
-
-          {/* Right Page (Desktop & Mobile Single View) */}
-          <div
-            onClick={currentPage < totalPages ? goToNext : undefined}
-            className={`relative bg-white shadow-2xl overflow-hidden transition-all duration-300 group ${
-              isMobile ? 'rounded-md shadow-2xl' : 'rounded-r-md'
-            } ${rightPageNum ? 'opacity-100 cursor-pointer' : 'opacity-0 pointer-events-none'} ${
-              isFlipping === 'forward' ? 'page-flip-animate-forward' : ''
-            }`}
-            style={{
-              boxShadow: isMobile
-                ? '0 25px 50px -12px rgba(0, 0, 0, 0.8)'
-                : '14px 20px 40px -8px rgba(0, 0, 0, 0.7)',
-            }}
-            title={rightPageNum && currentPage < totalPages ? 'Click to flip forward' : undefined}
-          >
-            {rightPageNum ? (
-              <>
-                <PdfPageCanvas
-                  pdfDocument={pdfDocument}
-                  pageNumber={rightPageNum}
-                  scale={scale}
-                  side={isMobile ? 'single' : 'right'}
-                  onPageLoaded={onDimensionsLoaded}
-                />
-                {/* Spine Depth Lighting Gradient on Desktop */}
-                {!isMobile && (
-                  <div className="absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-black/30 via-black/5 to-transparent pointer-events-none" />
-                )}
-                {/* Corner Turn Cue on Hover / Tap */}
-                {currentPage < totalPages && (
-                  <div className="page-corner-curl-right opacity-40 group-hover:opacity-100 transition-opacity" />
-                )}
-              </>
-            ) : (
-              <div
-                style={{
-                  width: `${Math.floor(baseDimensions.width * scale)}px`,
-                  height: `${Math.floor(baseDimensions.height * scale)}px`,
-                }}
-              />
-            )}
+      <div className="relative w-full h-full flex items-center justify-center select-none overflow-hidden py-4 px-2">
+        {!isReady && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-slate-950/70 backdrop-blur-sm">
+            <Loader2 className="w-10 h-10 text-brand-400 animate-spin mb-3" />
+            <p className="text-sm font-medium text-slate-300">Preparing 3D Interactive Flipbook...</p>
           </div>
+        )}
+
+        {/* StPageFlip Root Mount Container */}
+        <div
+          ref={bookContainerRef}
+          className="flipbook-root-stage shadow-2xl rounded-sm"
+          style={{
+            perspective: '2000px',
+            transformStyle: 'preserve-3d',
+            opacity: isReady ? 1 : 0,
+            transition: 'opacity 0.4s ease',
+          }}
+        >
+          {pageNumbers.map((pageNum) => {
+            const isCover = pageNum === 1 || pageNum === totalPages;
+            return (
+              <div
+                key={pageNum}
+                className={`st-page-item bg-white overflow-hidden shadow-md flex items-center justify-center ${
+                  isCover ? 'st-cover-page' : 'st-inner-page'
+                }`}
+                data-density={isCover ? 'hard' : 'soft'}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: '#ffffff',
+                }}
+              >
+                <canvas
+                  ref={(el) => {
+                    if (el) {
+                      canvasRefs.current.set(pageNum, el);
+                      renderPageToCanvas(pageNum);
+                    } else {
+                      canvasRefs.current.delete(pageNum);
+                    }
+                  }}
+                  className="w-full h-full object-contain block pointer-events-none"
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
     );

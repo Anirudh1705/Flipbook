@@ -184,23 +184,31 @@
   z-index: 40;
 }
 
-/* St-PageFlip / Turn.js Container & Canvas Styles */
-.turnjs-flipbook-container {
+/* St-PageFlip Realistic 3D Stage & Canvas Styles */
+.flipbook-root-stage {
   position: relative;
   margin: 0 auto;
   user-select: none;
   -webkit-user-select: none;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.8), 0 0 40px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.turnjs-flipbook-container .page {
-  background-color: #ffffff;
-}
-
-.turn-page-item {
+.st-page-item {
   box-sizing: border-box;
   background-color: #ffffff;
-  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.04);
+}
+
+.st-cover-page {
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.st-inner-page {
+  box-shadow: inset 0 0 35px rgba(0, 0, 0, 0.06);
 }
 
 /* Glassmorphism utilities */
