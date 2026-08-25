@@ -2,6 +2,18 @@ export const config = {
   runtime: 'edge',
 };
 
+function normalizeUrl(rawUrl: string): string {
+  let decoded = rawUrl;
+  try {
+    while (decoded.includes('%20') || decoded.includes('%25')) {
+      const prev = decoded;
+      decoded = decodeURIComponent(decoded);
+      if (decoded === prev) break;
+    }
+  } catch {}
+  return encodeURI(decoded);
+}
+
 export default async function handler(request: Request) {
   if (request.method === 'OPTIONS') {
     return new Response(null, {
@@ -29,8 +41,7 @@ export default async function handler(request: Request) {
   }
 
   try {
-    // Normalize URL
-    let targetUrl = decodeURI(rawUrl);
+    const targetUrl = normalizeUrl(rawUrl);
 
     const headers = new Headers({
       'User-Agent':
@@ -43,7 +54,7 @@ export default async function handler(request: Request) {
       headers.set('Range', clientRange);
     }
 
-    let response = await fetch(encodeURI(targetUrl), {
+    let response = await fetch(targetUrl, {
       headers,
       redirect: 'manual',
     });
@@ -53,7 +64,7 @@ export default async function handler(request: Request) {
       const location = response.headers.get('location');
       if (location) {
         const redirectTarget = new URL(location, targetUrl).toString();
-        response = await fetch(encodeURI(decodeURI(redirectTarget)), {
+        response = await fetch(normalizeUrl(redirectTarget), {
           headers,
           redirect: 'follow',
         });
