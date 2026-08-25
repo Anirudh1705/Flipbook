@@ -226,7 +226,7 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
         startPage: Math.max(0, currentPage - 1),
         startZIndex: 5,
         autoSize: true,
-        showCover: !isMobile && !isLandscape, // Never offset cover on mobile!
+        showCover: false, // Never add extra hardcover white border margins!
         mobileScrollSupport: false,
         useMouseEvents: true,
         swipeDistance: 30,

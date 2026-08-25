@@ -13,7 +13,7 @@
     overflow-x: hidden;
   }
 
-  /* StPageFlip responsive centering and full-width */
+  /* StPageFlip responsive centering and full-width without white borders */
   .stf__parent {
     display: flex !important;
     align-items: center !important;
@@ -24,6 +24,14 @@
   .stf__wrapper {
     max-width: 100vw !important;
     margin: 0 auto !important;
+    padding: 0 !important;
+    border: 0 !important;
+  }
+
+  .stf__item, .stf__block {
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
   }
 
   /* Custom scrollbars */
