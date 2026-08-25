@@ -22,7 +22,7 @@ export const AdminLoginPage: React.FC = () => {
 
     // 1. Verify email against authorized whitelist
     if (!isAuthorizedAdminEmail(cleanEmail)) {
-      setError(`Access Denied: "${cleanEmail}" is not an authorized administrator email.`);
+      setError('Access Denied: You are not authorized to access the admin portal.');
       setLoading(false);
       return;
     }
@@ -101,7 +101,7 @@ export const AdminLoginPage: React.FC = () => {
           </div>
           <h2 className="text-xl font-bold text-slate-100">Administrator Login</h2>
           <p className="text-xs text-slate-400">
-            Authorized administrator access only
+            Sign in to manage publications and settings
           </p>
         </div>
 
@@ -115,7 +115,7 @@ export const AdminLoginPage: React.FC = () => {
         {/* Form */}
         <form onSubmit={handleLogin} className="space-y-4 text-xs">
           <div className="space-y-1.5">
-            <label className="text-slate-300 font-medium">Authorized Admin Email</label>
+            <label className="text-slate-300 font-medium">Email Address</label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
@@ -123,7 +123,7 @@ export const AdminLoginPage: React.FC = () => {
                 required
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="anirudhkaushik@galgotiasuniversity.edu.in"
+                placeholder="admin@example.com"
                 className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-100 focus:border-brand-500 outline-none"
               />
             </div>
