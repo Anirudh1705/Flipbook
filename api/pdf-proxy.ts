@@ -1,45 +1,124 @@
-export const config = {
-  runtime: 'edge',
-};
+import http from 'node:http';
+import https from 'node:https';
 
-function normalizeUrl(rawUrl: string): string {
-  let decoded = rawUrl;
-  try {
-    while (
-      decoded.includes('%20') ||
-      decoded.includes('%25') ||
-      decoded.includes('%28') ||
-      decoded.includes('%29')
-    ) {
-      const prev = decoded;
-      decoded = decodeURIComponent(decoded);
-      if (decoded === prev) break;
-    }
-  } catch {}
-
-  return encodeURI(decoded)
-    .replace(/\(/g, '%28')
-    .replace(/\)/g, '%29');
+function fetchArchiveMetadata(identifier: string): Promise<any> {
+  return new Promise(resolve => {
+    https
+      .get(`https://archive.org/metadata/${identifier}`, res => {
+        let data = '';
+        res.on('data', chunk => (data += chunk));
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch {
+            resolve(null);
+          }
+        });
+      })
+      .on('error', () => resolve(null));
+  });
 }
 
-export default async function handler(request: Request) {
-  if (request.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-        'Access-Control-Allow-Headers': 'Range, Origin, Content-Type, Accept',
-        'Access-Control-Expose-Headers': 'Accept-Ranges, Content-Range, Content-Length, Content-Type',
-      },
-    });
+function streamUrl(
+  targetUrl: string,
+  clientRange: string | undefined,
+  req: any,
+  res: any,
+  redirectCount = 0
+) {
+  if (redirectCount > 5) {
+    res.status(500).send('Too many redirects');
+    return;
   }
 
-  const { searchParams } = new URL(request.url);
-  let rawUrl = searchParams.get('url');
+  try {
+    const parsed = new URL(targetUrl);
+    const client = parsed.protocol === 'https:' ? https : http;
+
+    const headers: Record<string, string> = {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      Accept: '*/*',
+      Host: parsed.host,
+    };
+
+    if (clientRange) {
+      headers['Range'] = clientRange;
+    }
+
+    const proxyReq = client.get(
+      {
+        protocol: parsed.protocol,
+        hostname: parsed.hostname,
+        port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+        path: parsed.pathname + parsed.search,
+        headers,
+      },
+      proxyRes => {
+        // Handle Redirects (301, 302, 307, 308)
+        if (
+          proxyRes.statusCode &&
+          proxyRes.statusCode >= 300 &&
+          proxyRes.statusCode < 400 &&
+          proxyRes.headers.location
+        ) {
+          const redirectLocation = new URL(proxyRes.headers.location, targetUrl).toString();
+          streamUrl(redirectLocation, clientRange, req, res, redirectCount + 1);
+          return;
+        }
+
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Range, Origin, Content-Type, Accept');
+        res.setHeader(
+          'Access-Control-Expose-Headers',
+          'Accept-Ranges, Content-Range, Content-Length, Content-Type'
+        );
+        res.setHeader('Accept-Ranges', 'bytes');
+        res.setHeader('Content-Type', proxyRes.headers['content-type'] || 'application/pdf');
+
+        if (proxyRes.headers['content-length']) {
+          res.setHeader('Content-Length', proxyRes.headers['content-length']);
+        }
+        if (proxyRes.headers['content-range']) {
+          res.setHeader('Content-Range', proxyRes.headers['content-range']);
+        }
+
+        res.status(proxyRes.statusCode || 200);
+        proxyRes.pipe(res);
+      }
+    );
+
+    proxyReq.on('error', err => {
+      if (!res.headersSent) {
+        res.status(500).send(`Proxy error: ${err.message}`);
+      }
+    });
+  } catch (err: any) {
+    if (!res.headersSent) {
+      res.status(500).send(`Proxy error: ${err.message}`);
+    }
+  }
+}
+
+export default async function handler(req: any, res: any) {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Range, Origin, Content-Type, Accept');
+    res.setHeader(
+      'Access-Control-Expose-Headers',
+      'Accept-Ranges, Content-Range, Content-Length, Content-Type'
+    );
+    res.status(204).end();
+    return;
+  }
+
+  let rawUrl = (req.query.url as string) || '';
 
   if (!rawUrl) {
-    return new Response('Missing target url', { status: 400 });
+    res.status(400).send('Missing url parameter');
+    return;
   }
 
   // Handle nested/double proxy encoding
@@ -48,73 +127,20 @@ export default async function handler(request: Request) {
     rawUrl = decodeURIComponent(parts[parts.length - 1]);
   }
 
-  try {
-    let targetUrl = normalizeUrl(rawUrl);
+  let targetUrl = rawUrl;
 
-    // If target is an Archive.org download gateway, resolve to direct storage cluster node
-    const archiveDownloadMatch = targetUrl.match(/archive\.org\/download\/([^/]+)\/(.+)/i);
-    if (archiveDownloadMatch) {
-      const identifier = archiveDownloadMatch[1];
-      const filename = archiveDownloadMatch[2];
-      try {
-        const metaRes = await fetch(`https://archive.org/metadata/${identifier}`);
-        if (metaRes.ok) {
-          const meta = await metaRes.json();
-          const server = meta.server || meta.d1 || meta.workable_servers?.[0] || 'ia601801.us.archive.org';
-          const dir = meta.dir || `/items/${identifier}`;
-          targetUrl = `https://${server}${dir}/${filename}`;
-        }
-      } catch {}
+  // If target is an Archive.org download gateway, resolve to direct storage cluster node
+  const archiveDownloadMatch = targetUrl.match(/archive\.org\/download\/([^/]+)\/(.+)/i);
+  if (archiveDownloadMatch) {
+    const identifier = archiveDownloadMatch[1];
+    const filename = archiveDownloadMatch[2];
+    const meta = await fetchArchiveMetadata(identifier);
+    if (meta) {
+      const server = meta.server || meta.d1 || meta.workable_servers?.[0] || 'ia601801.us.archive.org';
+      const dir = meta.dir || `/items/${identifier}`;
+      targetUrl = `https://${server}${dir}/${filename}`;
     }
-
-    const headers = new Headers({
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': '*/*',
-    });
-
-    const clientRange = request.headers.get('range');
-    if (clientRange) {
-      headers.set('Range', clientRange);
-    }
-
-    let response = await fetch(targetUrl, {
-      headers,
-      redirect: 'manual',
-    });
-
-    // Follow redirect manually if 301/302/307/308
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('location');
-      if (location) {
-        const redirectTarget = new URL(location, targetUrl).toString();
-        response = await fetch(normalizeUrl(redirectTarget), {
-          headers,
-          redirect: 'follow',
-        });
-      }
-    }
-
-    const responseHeaders = new Headers();
-    response.headers.forEach((val, key) => {
-      responseHeaders.set(key, val);
-    });
-
-    responseHeaders.set('Access-Control-Allow-Origin', '*');
-    responseHeaders.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-    responseHeaders.set('Access-Control-Allow-Headers', 'Range, Origin, Content-Type, Accept');
-    responseHeaders.set('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Range, Content-Length, Content-Type');
-    responseHeaders.set('Accept-Ranges', 'bytes');
-    if (!responseHeaders.has('Content-Type')) {
-      responseHeaders.set('Content-Type', 'application/pdf');
-    }
-
-    return new Response(response.body, {
-      status: response.status === 302 || response.status === 301 ? 200 : response.status,
-      statusText: response.statusText,
-      headers: responseHeaders,
-    });
-  } catch (error: any) {
-    return new Response(`Proxy error: ${error.message}`, { status: 500 });
   }
+
+  streamUrl(targetUrl, req.headers.range, req, res);
 }
