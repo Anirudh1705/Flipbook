@@ -7,6 +7,7 @@ import {
   deleteBookFromFirestore,
 } from '../lib/firebase';
 import { supabase, isSupabaseConfigured, getLocalBooks, saveLocalBooks } from '../lib/supabase';
+import { deletePdfFromStorage } from '../lib/pdfStorage';
 
 export function useBooks() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -21,13 +22,12 @@ export function useBooks() {
     if (isFirebaseConfigured) {
       try {
         const firestoreBooks = await getBooksFromFirestore();
-        if (firestoreBooks.length > 0) {
-          setBooks(firestoreBooks);
-          setLoading(false);
-          return;
-        }
+        setBooks(firestoreBooks);
+        saveLocalBooks(firestoreBooks);
+        setLoading(false);
+        return;
       } catch (err: any) {
-        console.warn('Firebase fetch failed, falling back:', err);
+        console.warn('Firebase fetch failed, falling back to local:', err);
       }
     }
 
@@ -40,8 +40,9 @@ export function useBooks() {
           .order('display_order', { ascending: true });
 
         if (dbError) throw dbError;
-        if (data && data.length > 0) {
+        if (data) {
           setBooks(data);
+          saveLocalBooks(data);
           setLoading(false);
           return;
         }
@@ -64,6 +65,13 @@ export function useBooks() {
     // 1. Firebase Firestore
     if (isFirebaseConfigured) {
       const saved = await saveBookToFirestore(bookData);
+      // Sync local storage
+      const current = getLocalBooks();
+      const exists = current.some(b => b.id === saved.id);
+      const updatedLocal = exists
+        ? current.map(b => (b.id === saved.id ? saved : b))
+        : [...current, saved];
+      saveLocalBooks(updatedLocal);
       await fetchBooks();
       return saved;
     }
@@ -123,26 +131,39 @@ export function useBooks() {
   };
 
   const deleteBook = async (id: string): Promise<void> => {
+    // Optimistically update UI
+    setBooks(prev => prev.filter(b => b.id !== id));
+
+    // Remove local storage
+    const current = getLocalBooks();
+    const target = current.find(b => b.id === id);
+    if (target?.pdf_url?.startsWith('idb://')) {
+      try {
+        await deletePdfFromStorage(target.pdf_url);
+      } catch {}
+    }
+    const updatedLocal = current.filter(b => b.id !== id);
+    saveLocalBooks(updatedLocal);
+
     // 1. Firebase Firestore
     if (isFirebaseConfigured) {
-      await deleteBookFromFirestore(id);
-      await fetchBooks();
-      return;
+      try {
+        await deleteBookFromFirestore(id);
+      } catch (err) {
+        console.warn('Firestore deletion failed:', err);
+      }
     }
 
     // 2. Supabase
     if (isSupabaseConfigured && supabase) {
-      const { error: deleteError } = await supabase.from('books').delete().eq('id', id);
-      if (deleteError) throw deleteError;
-      await fetchBooks();
-      return;
+      try {
+        await supabase.from('books').delete().eq('id', id);
+      } catch (err) {
+        console.warn('Supabase deletion failed:', err);
+      }
     }
 
-    // 3. Local
-    const current = getLocalBooks();
-    const updated = current.filter(b => b.id !== id);
-    saveLocalBooks(updated);
-    setBooks(updated);
+    await fetchBooks();
   };
 
   const togglePublish = async (id: string, currentStatus: boolean): Promise<void> => {
