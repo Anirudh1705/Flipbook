@@ -1,8 +1,47 @@
 {
-  "name": "flipbook",
-  "private": true,
-  "version": "0.0.0",
+  "name": "@anirudh1705/flipbook",
+  "version": "1.0.0",
+  "description": "High-performance digital flipbook and continuous vertical scroller for large 300-500MB PDFs",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "type": "module",
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Anirudh1705/Flipbook.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Anirudh1705/Flipbook/issues"
+  },
+  "homepage": "https://github.com/Anirudh1705/Flipbook#readme",
+  "keywords": [
+    "flipbook",
+    "pdf",
+    "pdfjs",
+    "react",
+    "scroller",
+    "large-pdf",
+    "digital-publishing",
+    "cloudflare-r2",
+    "magazine-reader"
+  ],
+  "author": "Anirudh Kaushik <kaushikanirudh38@gmail.com>",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
