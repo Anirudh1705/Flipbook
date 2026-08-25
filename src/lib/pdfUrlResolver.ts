@@ -4,7 +4,13 @@
  * and routes non-CORS hosts (like Archive.org) through the built-in streaming proxy.
  */
 export async function resolveDirectPdfUrl(rawUrl: string): Promise<string> {
-  const url = rawUrl.trim();
+  let url = rawUrl.trim();
+
+  // Strip existing proxy wrappers to avoid double-proxying
+  while (url.includes('api/pdf-proxy?url=')) {
+    const parts = url.split(/api\/pdf-proxy\?url=/);
+    url = decodeURIComponent(parts[parts.length - 1]);
+  }
 
   // 1. Internet Archive details page: https://archive.org/details/IDENTIFIER
   const archiveDetailsMatch = url.match(/^https?:\/\/archive\.org\/details\/([^/?#]+)/i);
@@ -14,14 +20,15 @@ export async function resolveDirectPdfUrl(rawUrl: string): Promise<string> {
       const metaRes = await fetch(`https://archive.org/metadata/${identifier}`);
       if (metaRes.ok) {
         const meta = await metaRes.json();
-        const pdfFile = meta?.files?.find((f: any) =>
-          f?.name?.toLowerCase()?.endsWith('.pdf') || f?.format?.toLowerCase()?.includes('pdf')
+        const pdfFile = meta?.files?.find(
+          (f: any) =>
+            f?.name?.toLowerCase()?.endsWith('.pdf') || f?.format?.toLowerCase()?.includes('pdf')
         );
         if (pdfFile && pdfFile.name) {
-          const encodedName = encodeURIComponent(pdfFile.name).replace(/%2F/g, '/');
-          const directArchiveUrl = `https://archive.org/download/${identifier}/${encodedName}`;
-          // In development or when proxy is available, route through proxy to bypass Archive.org CORS
-          return `/api/pdf-proxy?url=${encodeURIComponent(directArchiveUrl)}`;
+          const server = meta.server || meta.d1 || meta.workable_servers?.[0] || 'ia601801.us.archive.org';
+          const dir = meta.dir || `/items/${identifier}`;
+          const directStorageUrl = `https://${server}${dir}/${encodeURI(decodeURI(pdfFile.name))}`;
+          return `/api/pdf-proxy?url=${encodeURIComponent(directStorageUrl)}`;
         }
       }
     } catch {
@@ -29,9 +36,10 @@ export async function resolveDirectPdfUrl(rawUrl: string): Promise<string> {
     }
   }
 
-  // 2. Direct Archive.org download link: https://archive.org/download/...
-  if (url.includes('archive.org/download/')) {
-    return `/api/pdf-proxy?url=${encodeURIComponent(url)}`;
+  // 2. Direct Archive.org download link: https://archive.org/download/... or storage node link
+  if (url.includes('archive.org/download/') || url.includes('.archive.org/items/')) {
+    const cleanUrl = encodeURI(decodeURI(url));
+    return `/api/pdf-proxy?url=${encodeURIComponent(cleanUrl)}`;
   }
 
   // 3. GitHub Blob URL: https://github.com/user/repo/blob/main/doc.pdf -> raw.githubusercontent.com
