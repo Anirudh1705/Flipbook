@@ -35,18 +35,11 @@ export const PdfScrollPage: React.FC<PdfScrollPageProps> = ({
             if (onVisible && entry.intersectionRatio > 0.4) {
               onVisible(pageNumber);
             }
-          } else {
-            // Memory conservation: unload canvas when far outside view (>800px away)
-            const bounds = entry.boundingClientRect;
-            const windowHeight = window.innerHeight;
-            if (bounds.bottom < -800 || bounds.top > windowHeight + 800) {
-              setIsInViewport(false);
-            }
           }
         });
       },
       {
-        rootMargin: '1000px 0px 1000px 0px',
+        rootMargin: '1200px 0px 1200px 0px',
         threshold: [0, 0.2, 0.5],
       }
     );

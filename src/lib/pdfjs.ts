@@ -1,5 +1,6 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { getPdfFromStorage } from './pdfStorage';
+import { getCachedPdfBinary, setCachedPdfBinary } from './pdfCache';
 
 // Configure the PDF.js Web Worker using the modern mjs worker URL in Vite
 const PDFJS_VERSION = pdfjsLib.version || '4.10.38';
@@ -9,10 +10,10 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * Creates an optimized PDF.js loading task with HTTP Range Requests or ArrayBuffer from IndexedDB.
+ * Creates an optimized PDF.js loading task with instant memory cache, browser CacheStorage, or HTTP Range Requests.
  */
 export async function getOptimizedDocumentTask(url: string) {
-  // If stored in local browser IndexedDB (from local upload)
+  // 1. If stored in local browser IndexedDB (from local upload)
   if (url.startsWith('idb://')) {
     const blob = await getPdfFromStorage(url);
     if (!blob) {
@@ -27,9 +28,20 @@ export async function getOptimizedDocumentTask(url: string) {
     });
   }
 
-  return pdfjsLib.getDocument({
+  // 2. Check instant L1/L2 in-memory and CacheStorage cache
+  const cachedBinary = await getCachedPdfBinary(url);
+  if (cachedBinary) {
+    return pdfjsLib.getDocument({
+      data: cachedBinary,
+      cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/cmaps/`,
+      cMapPacked: true,
+      standardFontDataUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/standard_fonts/`,
+    });
+  }
+
+  // 3. Fallback to progressive HTTP byte range streaming with background caching
+  const task = pdfjsLib.getDocument({
     url,
-    // Critical large-PDF streaming optimizations
     disableAutoFetch: true,
     disableStream: false,
     disableRange: false,
@@ -38,6 +50,20 @@ export async function getOptimizedDocumentTask(url: string) {
     cMapPacked: true,
     standardFontDataUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/standard_fonts/`,
   });
+
+  // Background caching: Once document promise resolves, save full binary into cache for instant repeat loads
+  task.promise.then(async (doc) => {
+    try {
+      const data = await doc.getData();
+      if (data && data.length > 0) {
+        setCachedPdfBinary(url, data);
+      }
+    } catch (e) {
+      // Ignore background cache errors
+    }
+  });
+
+  return task;
 }
 
 export { pdfjsLib };
