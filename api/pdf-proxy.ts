@@ -49,7 +49,23 @@ export default async function handler(request: Request) {
   }
 
   try {
-    const targetUrl = normalizeUrl(rawUrl);
+    let targetUrl = normalizeUrl(rawUrl);
+
+    // If target is an Archive.org download gateway, resolve to direct storage cluster node
+    const archiveDownloadMatch = targetUrl.match(/archive\.org\/download\/([^/]+)\/(.+)/i);
+    if (archiveDownloadMatch) {
+      const identifier = archiveDownloadMatch[1];
+      const filename = archiveDownloadMatch[2];
+      try {
+        const metaRes = await fetch(`https://archive.org/metadata/${identifier}`);
+        if (metaRes.ok) {
+          const meta = await metaRes.json();
+          const server = meta.server || meta.d1 || meta.workable_servers?.[0] || 'ia601801.us.archive.org';
+          const dir = meta.dir || `/items/${identifier}`;
+          targetUrl = `https://${server}${dir}/${filename}`;
+        }
+      } catch {}
+    }
 
     const headers = new Headers({
       'User-Agent':
@@ -67,7 +83,7 @@ export default async function handler(request: Request) {
       redirect: 'manual',
     });
 
-    // Follow redirect manually if 301/302/307/308 (Archive.org storage redirection)
+    // Follow redirect manually if 301/302/307/308
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location');
       if (location) {
