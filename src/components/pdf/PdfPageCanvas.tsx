@@ -110,9 +110,9 @@ export const PdfPageCanvas: React.FC<PdfPageCanvasProps> = ({
 
   // Distinct shadow and spine lighting based on book side
   const getSideShadowClass = () => {
-    if (side === 'left') return 'page-shadow-left border-r border-slate-800/60';
-    if (side === 'right') return 'page-shadow-right border-l border-slate-800/60';
-    return 'shadow-2xl';
+    if (side === 'left') return 'page-shadow-left border-r border-slate-800/60 shadow-2xl';
+    if (side === 'right') return 'page-shadow-right border-l border-slate-800/60 shadow-2xl';
+    return '';
   };
 
   return (
