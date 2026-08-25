@@ -271,7 +271,7 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
 
       {/* Stage: 3D Flipbook or Continuous Vertical Scroll */}
       {viewMode === 'flipbook' ? (
-        <main className="flex-1 min-h-0 w-full h-full relative flex items-center justify-center pt-12 sm:pt-14 pb-12 sm:pb-16 overflow-hidden">
+        <main className="flex-1 min-h-0 w-full h-full relative flex items-center justify-center pt-12 sm:pt-14 pb-0 sm:pb-16 px-0 overflow-hidden">
           <StPageFlipBook
             ref={pageFlipRef}
             pdfDocument={pdfDocument}

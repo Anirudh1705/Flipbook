@@ -99,9 +99,14 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
           let targetPageH: number;
 
           if (isMobile) {
-            // Full mobile width fill (100% of mobile screen width, zero waste!)
-            targetPageW = Math.min(window.innerWidth - 8, 540);
-            targetPageH = Math.round((rawH / rawW) * targetPageW);
+            // Full mobile screen fill: 100% width, height proportionally fitted to screen
+            const screenW = window.innerWidth || 390;
+            const availH = window.innerHeight - 56;
+            const fitW = screenW / rawW;
+            const fitH = availH / rawH;
+            const fit = Math.min(fitW, fitH);
+            targetPageW = Math.round(rawW * fit);
+            targetPageH = Math.round(rawH * fit);
           } else if (isLandscapePdf) {
             // Desktop landscape slide: fill max available stage
             const fitW = (stageW - 16) / rawW;
@@ -118,7 +123,7 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
             targetPageH = Math.round(rawH * fit);
           }
 
-          setBookSize({ width: Math.max(320, targetPageW), height: Math.max(450, targetPageH) });
+          setBookSize({ width: targetPageW, height: targetPageH });
 
           const renderedUrls: string[] = [];
           // Ultra-high DPI scale for crystal clear, razor-sharp text and graphics
@@ -209,19 +214,19 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
       const pageFlip = new PageFlip(bookContainerRef.current, {
         width: bookSize.width,
         height: bookSize.height,
-        size: 'stretch',
-        minWidth: 200,
-        maxWidth: 2400,
-        minHeight: 300,
-        maxHeight: 2000,
+        size: 'fixed',
+        minWidth: 100,
+        maxWidth: 3000,
+        minHeight: 100,
+        maxHeight: 3000,
         drawShadow: true,
         maxShadowOpacity: 0.5,
-        flippingTime: 700,
+        flippingTime: 650,
         usePortrait: isMobile || isLandscape,
         startPage: Math.max(0, currentPage - 1),
         startZIndex: 5,
         autoSize: true,
-        showCover: !isLandscape, // cover effect for portrait books
+        showCover: !isMobile && !isLandscape, // Never offset cover on mobile!
         mobileScrollSupport: false,
         useMouseEvents: true,
         swipeDistance: 30,
