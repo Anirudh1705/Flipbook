@@ -80,7 +80,12 @@ export async function resolveDirectPdfUrl(rawUrl: string): Promise<string> {
     return `/api/pdf-proxy?url=${encodeURIComponent(cleanDirect)}`;
   }
 
-  // 3. GitHub Blob URL: https://github.com/user/repo/blob/main/doc.pdf -> raw.githubusercontent.com
+  // 3. GitHub Releases: https://github.com/user/repo/releases/download/tag/file.pdf
+  if (url.includes('github.com/') && url.includes('/releases/download/')) {
+    return `/api/pdf-proxy?url=${encodeURIComponent(url)}`;
+  }
+
+  // 4. GitHub Blob URL: https://github.com/user/repo/blob/main/doc.pdf -> raw.githubusercontent.com
   const githubBlobMatch = url.match(
     /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+\.pdf)$/i
   );
@@ -89,16 +94,18 @@ export async function resolveDirectPdfUrl(rawUrl: string): Promise<string> {
     return `https://raw.githubusercontent.com/${user}/${repo}/${branch}/${path}`;
   }
 
-  // 4. Dropbox share links: https://www.dropbox.com/s/xxxx/doc.pdf?dl=0 -> ?raw=1
-  if (url.includes('dropbox.com/s/')) {
-    return url.replace(/[?&]dl=[01]/, '').concat(url.includes('?') ? '&raw=1' : '?raw=1');
+  // 5. Dropbox share links: https://www.dropbox.com/s/xxxx/doc.pdf?dl=0 -> raw stream via proxy
+  if (url.includes('dropbox.com/')) {
+    const directDropbox = url.replace(/[?&]dl=[01]/, '').concat(url.includes('?') ? '&raw=1' : '?raw=1');
+    return `/api/pdf-proxy?url=${encodeURIComponent(directDropbox)}`;
   }
 
-  // 5. Google Drive share links: https://drive.google.com/file/d/FILE_ID/view -> uc?export=download&id=FILE_ID
+  // 6. Google Drive share links: https://drive.google.com/file/d/FILE_ID/view
   const gdriveMatch = url.match(/^https?:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i);
   if (gdriveMatch) {
     const fileId = gdriveMatch[1];
-    return `https://drive.google.com/uc?export=download&id=${fileId}`;
+    const directGdrive = `https://drive.google.com/uc?export=download&confirm=t&id=${fileId}`;
+    return `/api/pdf-proxy?url=${encodeURIComponent(directGdrive)}`;
   }
 
   return url;
