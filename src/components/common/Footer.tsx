@@ -55,7 +55,17 @@ export const Footer: React.FC = () => {
         </div>
 
         <div className="pt-8 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© {new Date().getFullYear()} Digital Flipbook Library. Engineered for high-capacity publications.</p>
+          <p>
+            © {new Date().getFullYear()} Digital Flipbook Library. Developed by{' '}
+            <a
+              href="https://www.linkedin.com/in/anirudh8760/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-300 hover:text-brand-400 underline underline-offset-2 transition-colors font-medium"
+            >
+              Anirudh
+            </a>
+          </p>
           <div className="flex items-center gap-4">
             <span>Instant Local Storage</span>
             <span>•</span>

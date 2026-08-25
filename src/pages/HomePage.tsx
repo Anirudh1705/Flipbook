@@ -147,7 +147,15 @@ export const HomePage: React.FC = () => {
 
       {/* Footer */}
       <footer className="relative z-10 w-full border-t border-slate-850 py-4 px-6 text-center text-xs text-slate-500 font-mono">
-        Flipbook Pro • Powered by Mozilla PDF.js & Instant Local Storage
+        Developed by{' '}
+        <a
+          href="https://www.linkedin.com/in/anirudh8760/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-slate-300 hover:text-brand-400 underline underline-offset-2 transition-colors font-medium"
+        >
+          Anirudh
+        </a>
       </footer>
     </div>
   );
