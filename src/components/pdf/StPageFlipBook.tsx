@@ -104,7 +104,7 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
             const availH = window.innerHeight - 56;
             const fitW = screenW / rawW;
             const fitH = availH / rawH;
-            const fit = Math.min(fitW, fitH);
+            const fit = Math.max(fitW, Math.min(fitW, fitH));
             targetPageW = Math.round(rawW * fit);
             targetPageH = Math.round(rawH * fit);
           } else if (isLandscapePdf) {
@@ -214,7 +214,7 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
       const pageFlip = new PageFlip(bookContainerRef.current, {
         width: bookSize.width,
         height: bookSize.height,
-        size: 'fixed',
+        size: 'stretch',
         minWidth: 100,
         maxWidth: 3000,
         minHeight: 100,
