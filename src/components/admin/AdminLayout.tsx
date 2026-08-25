@@ -72,6 +72,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
         {children}
       </main>
+
+      {/* Admin Footer */}
+      <footer className="w-full border-t border-slate-900 bg-slate-950/80 py-4 px-6 text-center text-xs text-slate-500 font-mono">
+        Developed by{' '}
+        <a
+          href="https://www.linkedin.com/in/anirudh8760/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-slate-400 hover:text-brand-400 underline underline-offset-2 transition-colors font-medium"
+        >
+          Anirudh
+        </a>
+      </footer>
     </div>
   );
 };

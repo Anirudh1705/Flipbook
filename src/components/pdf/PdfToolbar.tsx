@@ -194,6 +194,18 @@ export const PdfToolbar: React.FC<PdfToolbarProps> = ({
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
+
+          {/* Developed by Anirudh */}
+          <a
+            href="https://www.linkedin.com/in/anirudh8760/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden lg:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-850 border border-slate-800 text-[11px] font-mono text-slate-400 hover:text-brand-400 transition-colors"
+            title="Developed by Anirudh"
+          >
+            <span>Dev:</span>
+            <span className="text-slate-200 font-semibold underline underline-offset-2">Anirudh</span>
+          </a>
         </div>
       </div>
 

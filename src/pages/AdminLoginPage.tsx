@@ -216,7 +216,7 @@ export const AdminLoginPage: React.FC = () => {
         </form>
 
         {/* Return to Public Portal */}
-        <div className="pt-4 border-t border-slate-850 text-center">
+        <div className="pt-4 border-t border-slate-850 text-center space-y-3">
           <Link
             to="/"
             className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
@@ -224,6 +224,17 @@ export const AdminLoginPage: React.FC = () => {
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Return to Public Portal</span>
           </Link>
+          <div className="text-[11px] text-slate-500 font-mono">
+            Developed by{' '}
+            <a
+              href="https://www.linkedin.com/in/anirudh8760/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 hover:text-brand-400 underline underline-offset-2 transition-colors font-medium"
+            >
+              Anirudh
+            </a>
+          </div>
         </div>
       </div>
     </div>

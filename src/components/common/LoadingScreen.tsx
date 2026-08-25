@@ -55,6 +55,18 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
               <span>Admin Dashboard</span>
             </Link>
           </div>
+
+          <div className="pt-2 text-[11px] text-slate-500 font-mono">
+            Developed by{' '}
+            <a
+              href="https://www.linkedin.com/in/anirudh8760/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 hover:text-brand-400 underline underline-offset-2 transition-colors font-medium"
+            >
+              Anirudh
+            </a>
+          </div>
         </div>
       </div>
     );
@@ -99,6 +111,18 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
         <p className="text-xs text-slate-400 italic">
           Zero full-file download wait. Renders seamlessly as bytes are indexed.
         </p>
+
+        <div className="pt-2 text-[11px] text-slate-500 font-mono">
+          Developed by{' '}
+          <a
+            href="https://www.linkedin.com/in/anirudh8760/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-slate-400 hover:text-brand-400 underline underline-offset-2 transition-colors font-medium"
+          >
+            Anirudh
+          </a>
+        </div>
       </div>
     </div>
   );
