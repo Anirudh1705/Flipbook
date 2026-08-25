@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
+import { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { PageFlip } from 'page-flip';
 import { playPageTurnSound } from '../../lib/pageAudio';
+import { Loader2 } from 'lucide-react';
 
 export interface TurnFlipbookHandle {
   flipNext: () => void;
@@ -35,14 +36,16 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
     const containerRef = useRef<HTMLDivElement | null>(null);
     const bookRef = useRef<HTMLDivElement | null>(null);
     const pageFlipInstanceRef = useRef<PageFlip | null>(null);
-    const [isInitialized, setIsInitialized] = useState<boolean>(false);
-    const renderedPagesRef = useRef<Set<number>>(new Set());
+    const [isLoadingImages, setIsLoadingImages] = useState<boolean>(true);
+    const [renderedImageUrls, setRenderedImageUrls] = useState<string[]>([]);
 
     // Page Dimensions based on scale
     const baseW = Math.max(300, baseDimensions.width);
     const baseH = Math.max(400, baseDimensions.height);
     const displayWidth = Math.floor(baseW * scale);
     const displayHeight = Math.floor(baseH * scale);
+
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
     // Expose control methods to parent toolbar
     useImperativeHandle(
@@ -70,143 +73,127 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
       [totalPages]
     );
 
-    // Render individual PDF page on demand onto canvas
-    const renderPdfCanvas = useCallback(
-      async (canvas: HTMLCanvasElement, pageNum: number) => {
-        if (!pdfDocument || pageNum < 1 || pageNum > totalPages) return;
-        try {
-          const page = await pdfDocument.getPage(pageNum);
-          const unscaledViewport = page.getViewport({ scale: 1.0 });
+    // Render all PDF pages into crisp high-res image data URLs
+    useEffect(() => {
+      let isCancelled = false;
 
-          if (onDimensionsLoaded && pageNum === 1) {
+      const renderAllPages = async () => {
+        if (!pdfDocument || totalPages === 0) return;
+        setIsLoadingImages(true);
+
+        try {
+          // Check base dimensions from page 1
+          const firstPage = await pdfDocument.getPage(1);
+          const unscaledVp = firstPage.getViewport({ scale: 1.0 });
+          if (onDimensionsLoaded) {
             onDimensionsLoaded({
-              width: unscaledViewport.width,
-              height: unscaledViewport.height,
+              width: unscaledVp.width,
+              height: unscaledVp.height,
             });
           }
 
           const dpr = Math.min(window.devicePixelRatio || 1, 2);
-          const viewport = page.getViewport({ scale: (displayWidth / unscaledViewport.width) * dpr });
-          const displayViewport = page.getViewport({ scale: displayWidth / unscaledViewport.width });
+          const renderScale = Math.max(1.5, ((displayWidth * 1.5) / unscaledVp.width) * dpr);
 
-          canvas.width = Math.floor(viewport.width);
-          canvas.height = Math.floor(viewport.height);
-          canvas.style.width = `${Math.floor(displayViewport.width)}px`;
-          canvas.style.height = `${Math.floor(displayViewport.height)}px`;
+          const imagePromises: Promise<string>[] = [];
 
-          const ctx = canvas.getContext('2d', { alpha: false });
-          if (!ctx) return;
+          for (let p = 1; p <= totalPages; p++) {
+            imagePromises.push(
+              (async () => {
+                const page = await pdfDocument.getPage(p);
+                const viewport = page.getViewport({ scale: renderScale });
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.floor(viewport.width);
+                canvas.height = Math.floor(viewport.height);
+                const ctx = canvas.getContext('2d', { alpha: false });
+                if (!ctx) return '';
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-          await (page as any).render({
-            canvasContext: ctx,
-            viewport: viewport,
-            canvas: canvas,
-          }).promise;
+                await (page as any).render({
+                  canvasContext: ctx,
+                  viewport: viewport,
+                  canvas: canvas,
+                }).promise;
 
-          renderedPagesRef.current.add(pageNum);
-        } catch (err: any) {
-          if (err.name !== 'RenderingCancelledException') {
-            console.warn(`Error rendering page ${pageNum}:`, err);
+                return canvas.toDataURL('image/jpeg', 0.92);
+              })()
+            );
+          }
+
+          const images = await Promise.all(imagePromises);
+          if (!isCancelled) {
+            setRenderedImageUrls(images);
+            setIsLoadingImages(false);
+          }
+        } catch (err) {
+          console.error('Error rendering PDF pages to images:', err);
+          if (!isCancelled) {
+            setIsLoadingImages(false);
           }
         }
-      },
-      [pdfDocument, totalPages, displayWidth, onDimensionsLoaded]
-    );
+      };
 
-    // Render visible pages in page-flip window
-    const renderSurroundingPages = useCallback(
-      (targetPageNum: number) => {
-        const pagesToRender = [
-          targetPageNum - 2,
-          targetPageNum - 1,
-          targetPageNum,
-          targetPageNum + 1,
-          targetPageNum + 2,
-        ].filter(p => p >= 1 && p <= totalPages);
+      renderAllPages();
 
-        pagesToRender.forEach(p => {
-          const canvas = document.getElementById(`flip-canvas-${p}`) as HTMLCanvasElement;
-          if (canvas && !renderedPagesRef.current.has(p)) {
-            renderPdfCanvas(canvas, p);
-          }
-        });
-      },
-      [totalPages, renderPdfCanvas]
-    );
+      return () => {
+        isCancelled = true;
+      };
+    }, [pdfDocument, totalPages, displayWidth, onDimensionsLoaded]);
 
-    // Detect mobile screen mode
-    const isMobileScreen = typeof window !== 'undefined' && window.innerWidth < 768;
-    const containerWidth = isMobileScreen ? displayWidth : displayWidth * 2;
-
-    // Initialize PageFlip engine
+    // Initialize PageFlip instance with rendered images
     useEffect(() => {
       const bookEl = bookRef.current;
-      if (!bookEl || !pdfDocument || totalPages === 0) return;
+      if (!bookEl || renderedImageUrls.length === 0 || isLoadingImages) return;
 
-      // Clean up previous instance if exists
+      // Clean up previous instance
       if (pageFlipInstanceRef.current) {
         try {
           pageFlipInstanceRef.current.destroy();
         } catch {}
         pageFlipInstanceRef.current = null;
       }
-      renderedPagesRef.current.clear();
+      bookEl.innerHTML = '';
 
-      const isMobile = window.innerWidth < 768;
+      const isMobileScreen = window.innerWidth < 768;
 
       const pageFlip = new PageFlip(bookEl, {
         width: displayWidth,
         height: displayHeight,
         size: 'fixed',
-        minWidth: 200,
-        maxWidth: 1400,
-        minHeight: 300,
-        maxHeight: 1800,
-        maxShadowOpacity: 0.4,
+        minWidth: 240,
+        maxWidth: 1600,
+        minHeight: 320,
+        maxHeight: 2000,
+        maxShadowOpacity: 0.45,
         showCover: false,
         mobileScrollSupport: false,
-        flippingTime: 500,
-        usePortrait: isMobile,
+        flippingTime: 600,
+        usePortrait: isMobileScreen,
         startPage: Math.max(0, Math.min(currentPage - 1, totalPages - 1)),
         drawShadow: true,
         autoSize: true,
         useMouseEvents: true,
         showPageCorners: true,
-        swipeDistance: 20,
+        swipeDistance: 25,
       });
 
-      const pageElements = bookEl.querySelectorAll<HTMLElement>('.page');
-      if (pageElements.length > 0) {
-        pageFlip.loadFromHTML(pageElements);
-        pageFlipInstanceRef.current = pageFlip;
-        setIsInitialized(true);
+      pageFlip.loadFromImages(renderedImageUrls);
+      pageFlipInstanceRef.current = pageFlip;
 
-        // Pre-render visible pages
-        renderSurroundingPages(currentPage);
+      // Event listeners
+      pageFlip.on('flip', (e: any) => {
+        const newPageIndex = typeof e.data === 'number' ? e.data : 0;
+        const newPageNumber = newPageIndex + 1;
+        playPageTurnSound();
+        onPageChange(newPageNumber);
+      });
 
-        // Eagerly render all remaining pages in background
-        for (let p = 1; p <= totalPages; p++) {
-          const canvas = document.getElementById(`flip-canvas-${p}`) as HTMLCanvasElement;
-          if (canvas) {
-            renderPdfCanvas(canvas, p);
-          }
-        }
-
-        // Event listeners
-        pageFlip.on('flip', (e: any) => {
-          const newPageIndex = typeof e.data === 'number' ? e.data : 0;
-          const newPageNumber = newPageIndex + 1;
+      pageFlip.on('changeState', (e: any) => {
+        if (e.data === 'flipping') {
           playPageTurnSound();
-          onPageChange(newPageNumber);
-          renderSurroundingPages(newPageNumber);
-        });
-
-        pageFlip.on('changeState', (e: any) => {
-          if (e.data === 'flipping') {
-            playPageTurnSound();
-          }
-        });
-      }
+        }
+      });
 
       return () => {
         if (pageFlipInstanceRef.current) {
@@ -216,59 +203,29 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
           pageFlipInstanceRef.current = null;
         }
       };
-    }, [pdfDocument, displayWidth, displayHeight, totalPages, renderPdfCanvas, renderSurroundingPages, onPageChange, currentPage]);
-
-    // Update surrounding canvas renders when currentPage changes from external control
-    useEffect(() => {
-      if (isInitialized) {
-        renderSurroundingPages(currentPage);
-      }
-    }, [currentPage, isInitialized, renderSurroundingPages]);
+    }, [renderedImageUrls, isLoadingImages, displayWidth, displayHeight, totalPages, onPageChange]);
 
     return (
       <div
         ref={containerRef}
-        className="relative w-full flex items-center justify-center select-none overflow-visible p-1 sm:p-6"
+        className="relative w-full h-full flex items-center justify-center select-none overflow-visible p-2 sm:p-6"
       >
+        {isLoadingImages && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/60 backdrop-blur-sm z-20">
+            <Loader2 className="w-10 h-10 text-emerald-400 animate-spin mb-3" />
+            <p className="text-slate-300 text-sm font-medium">Preparing Flipbook Experience...</p>
+          </div>
+        )}
+
         <div
-          key={`${containerWidth}-${displayHeight}-${totalPages}`}
           ref={bookRef}
           className="turnjs-flipbook-container shadow-2xl rounded-lg mx-auto"
           style={{
-            width: `${containerWidth}px`,
+            width: `${isMobile ? displayWidth : displayWidth * 2}px`,
             height: `${displayHeight}px`,
+            minHeight: '280px',
           }}
-        >
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
-            <div
-              key={pageNum}
-              className="page bg-white overflow-hidden"
-              data-density="soft"
-              style={{
-                width: `${displayWidth}px`,
-                height: `${displayHeight}px`,
-                backgroundColor: '#ffffff',
-              }}
-            >
-              <div
-                className="page-content relative w-full h-full flex items-center justify-center bg-white overflow-hidden"
-                style={{
-                  width: `${displayWidth}px`,
-                  height: `${displayHeight}px`,
-                }}
-              >
-                <canvas
-                  id={`flip-canvas-${pageNum}`}
-                  className="block bg-white"
-                  style={{
-                    width: `${displayWidth}px`,
-                    height: `${displayHeight}px`,
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
+        />
       </div>
     );
   }
