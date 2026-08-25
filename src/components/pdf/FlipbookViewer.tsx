@@ -99,15 +99,14 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    const scrollTop = container.scrollTop;
-    const midPoint = scrollTop + container.clientHeight / 2;
+    const containerRect = container.getBoundingClientRect();
+    const containerMidY = containerRect.top + containerRect.height / 2;
 
     for (let p = 1; p <= totalPages; p++) {
       const el = document.getElementById(`page-container-${p}`);
       if (el) {
-        const top = el.offsetTop;
-        const bottom = top + el.offsetHeight;
-        if (midPoint >= top && midPoint <= bottom) {
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= containerMidY && rect.bottom >= containerMidY) {
           setCurrentPage(p);
           break;
         }
@@ -195,31 +194,6 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleNextPage, handlePrevPage]);
 
-  // Direct touch drag scrolling handler for mobile devices
-  const touchStartY = useRef<number>(0);
-  const touchStartScrollTop = useRef<number>(0);
-  const isTouchDragging = useRef<boolean>(false);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 1 && scrollContainerRef.current) {
-      touchStartY.current = e.touches[0].clientY;
-      touchStartScrollTop.current = scrollContainerRef.current.scrollTop;
-      isTouchDragging.current = true;
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (isTouchDragging.current && e.touches.length === 1 && scrollContainerRef.current) {
-      const currentY = e.touches[0].clientY;
-      const deltaY = touchStartY.current - currentY;
-      scrollContainerRef.current.scrollTop = touchStartScrollTop.current + deltaY;
-    }
-  };
-
-  const handleTouchEnd = () => {
-    isTouchDragging.current = false;
-  };
-
   return (
     <div
       ref={containerRef}
@@ -281,16 +255,11 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
       <main
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
         style={{
           WebkitOverflowScrolling: 'touch',
           touchAction: 'pan-y',
-          overscrollBehaviorY: 'contain',
         }}
-        className="flex-1 min-h-0 w-full overflow-y-scroll overflow-x-hidden pt-16 pb-6 sm:pb-24 px-1 sm:px-4 scrollbar-thin flex justify-center touch-pan-y"
+        className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden pt-16 pb-6 sm:pb-24 px-1 sm:px-4 flex justify-center"
       >
         <div className="w-full flex flex-col items-center mx-auto my-2 sm:my-4 max-w-full sm:max-w-fit shadow-2xl rounded-lg sm:rounded-xl overflow-hidden border border-slate-800/80 bg-white">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
