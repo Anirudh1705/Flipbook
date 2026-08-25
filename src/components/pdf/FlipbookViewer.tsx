@@ -86,13 +86,17 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
     }
   }, [baseDimensions, calculateFitScale]);
 
-  // Smooth scroll helper for scroll mode
-  const scrollToPage = (page: number) => {
+  // Smooth scroll helper for continuous document reader
+  const scrollToPage = useCallback((page: number) => {
+    const container = scrollContainerRef.current;
     const el = document.getElementById(`page-container-${page}`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (container && el) {
+      const containerRect = container.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const relativeTop = elRect.top - containerRect.top + container.scrollTop;
+      container.scrollTo({ top: Math.max(0, relativeTop - 70), behavior: 'smooth' });
     }
-  };
+  }, []);
 
   // Live scroll position listener to update current page indicator
   const handleScroll = useCallback(() => {
@@ -125,13 +129,13 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
     const next = Math.min(currentPage + 1, totalPages);
     setCurrentPage(next);
     scrollToPage(next);
-  }, [currentPage, totalPages]);
+  }, [currentPage, totalPages, scrollToPage]);
 
   const handlePrevPage = useCallback(() => {
     const prev = Math.max(currentPage - 1, 1);
     setCurrentPage(prev);
     scrollToPage(prev);
-  }, [currentPage]);
+  }, [currentPage, scrollToPage]);
 
   const handleFirstPage = () => handleGoToPage(1);
   const handleLastPage = () => handleGoToPage(totalPages);
@@ -162,6 +166,21 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
 
+  // Global mouse wheel listener to guarantee scrolling from any screen position
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+      if (['INPUT', 'TEXTAREA'].includes((document.activeElement as HTMLElement)?.tagName)) return;
+      if (!container.contains(e.target as Node)) {
+        container.scrollTop += e.deltaY;
+      }
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: true });
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, []);
+
   // Keyboard navigation shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -169,10 +188,10 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
         return;
       }
 
-      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
         e.preventDefault();
         handleNextPage();
-      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
         e.preventDefault();
         handlePrevPage();
       } else if (e.key === '+' || e.key === '=') {

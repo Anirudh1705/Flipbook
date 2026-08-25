@@ -63,7 +63,7 @@ export const PdfScrollPage: React.FC<PdfScrollPageProps> = ({
         minHeight: `${targetHeight}px`,
         touchAction: 'pan-y',
       }}
-      className="relative my-0 mx-auto rounded-none overflow-hidden bg-white shadow-lg border-b border-slate-200/40 last:border-b-0 transition-all duration-150 touch-pan-y"
+      className="relative my-0 mx-auto rounded-none overflow-hidden bg-white shadow-lg border-b border-slate-200/40 last:border-b-0"
     >
       {isInViewport ? (
         <PdfPageCanvas
