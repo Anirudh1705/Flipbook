@@ -13,11 +13,7 @@ import {
   LayoutGrid,
   Search,
   BookOpen,
-  Columns2,
-  Square,
   Sparkles,
-  Rows3,
-  BookMarked,
   Layers,
 } from 'lucide-react';
 import type { Book } from '../../types/book';
@@ -29,8 +25,6 @@ interface PdfToolbarProps {
   scale: number;
   isFullscreen: boolean;
   showThumbnails: boolean;
-  viewMode: 'scroll' | 'flipbook';
-  spreadMode: 'single' | 'double';
   onPrevPage: () => void;
   onNextPage: () => void;
   onFirstPage: () => void;
@@ -43,8 +37,6 @@ interface PdfToolbarProps {
   onToggleFullscreen: () => void;
   onToggleThumbnails: () => void;
   onToggleSearch: () => void;
-  onToggleViewMode: () => void;
-  onToggleSpreadMode: () => void;
 }
 
 export const PdfToolbar: React.FC<PdfToolbarProps> = ({
@@ -54,8 +46,6 @@ export const PdfToolbar: React.FC<PdfToolbarProps> = ({
   scale,
   isFullscreen,
   showThumbnails,
-  viewMode,
-  spreadMode,
   onPrevPage,
   onNextPage,
   onFirstPage,
@@ -68,8 +58,6 @@ export const PdfToolbar: React.FC<PdfToolbarProps> = ({
   onToggleFullscreen,
   onToggleThumbnails,
   onToggleSearch,
-  onToggleViewMode,
-  onToggleSpreadMode,
 }) => {
   const [jumpInput, setJumpInput] = useState<string>('');
   const [showJumpDialog, setShowJumpDialog] = useState<boolean>(false);
@@ -127,36 +115,10 @@ export const PdfToolbar: React.FC<PdfToolbarProps> = ({
 
         {/* Right Actions */}
         <div className="flex items-center gap-1 sm:gap-2">
-          {/* Continuous Scroll vs Flipbook Mode Switcher */}
-          <button
-            onClick={onToggleViewMode}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-xs font-medium border border-slate-800 text-brand-400 transition-colors"
-            title={viewMode === 'scroll' ? 'Switch to Flipbook Spread View' : 'Switch to Continuous Scroll View'}
-          >
-            {viewMode === 'scroll' ? (
-              <>
-                <Rows3 className="w-4 h-4" />
-                <span className="hidden lg:inline text-[11px]">Continuous Scroll</span>
-              </>
-            ) : (
-              <>
-                <BookMarked className="w-4 h-4" />
-                <span className="hidden lg:inline text-[11px]">Book Spread</span>
-              </>
-            )}
-          </button>
-
-          {/* Spread Mode Toggle (Only in Flipbook mode on Desktop) */}
-          {viewMode === 'flipbook' && (
-            <button
-              onClick={onToggleSpreadMode}
-              className="hidden md:flex p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-850 transition-colors"
-              title={spreadMode === 'double' ? 'Switch to Single Page View' : 'Switch to Dual Spread View'}
-              aria-label="Toggle Page Spread View"
-            >
-              {spreadMode === 'double' ? <Columns2 className="w-4 h-4 text-brand-400" /> : <Square className="w-4 h-4" />}
-            </button>
-          )}
+          {/* Mobile Page Indicator Pill */}
+          <span className="sm:hidden px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800 text-[11px] font-mono text-brand-300 font-semibold shadow-sm">
+            {currentPage} / {totalPages}
+          </span>
 
           {/* Thumbnails Toggle */}
           <button
@@ -206,8 +168,8 @@ export const PdfToolbar: React.FC<PdfToolbarProps> = ({
         </div>
       </div>
 
-      {/* Bottom Floating Control Bar */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 max-w-2xl w-[94%] sm:w-auto">
+      {/* Bottom Floating Control Bar (Desktop / Tablet only) */}
+      <div className="hidden sm:block absolute bottom-4 left-1/2 -translate-x-1/2 z-30 max-w-2xl w-[94%] sm:w-auto">
         <div className="glass-toolbar rounded-2xl p-1.5 sm:p-2 border border-slate-800 shadow-2xl flex items-center justify-between sm:justify-center gap-1 sm:gap-3 text-xs text-slate-300">
           {/* First & Previous Page */}
           <div className="flex items-center gap-1">

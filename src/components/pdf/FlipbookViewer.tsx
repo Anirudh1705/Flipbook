@@ -20,7 +20,6 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
   // Viewport & Layout state - Continuous high-performance document reader
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
-  const [spreadMode, setSpreadMode] = useState<'single' | 'double'>('single');
   const [scale, setScale] = useState<number>(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       const availWidth = window.innerWidth - 24;
@@ -28,7 +27,6 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
     }
     return 1.0;
   });
-  const [viewMode, setViewMode] = useState<'scroll' | 'flipbook'>('scroll');
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showThumbnails, setShowThumbnails] = useState<boolean>(false);
   const [showSearch, setShowSearch] = useState<boolean>(false);
@@ -43,11 +41,7 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
   // Responsive mobile detection
   useEffect(() => {
     const checkMobile = () => {
-      const mobile = window.innerWidth < 768;
-      setIsMobile(mobile);
-      if (mobile) {
-        setSpreadMode('single');
-      }
+      setIsMobile(window.innerWidth < 768);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -90,7 +84,7 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
       hasInitializedScale.current = true;
       calculateFitScale('page');
     }
-  }, [baseDimensions, viewMode, calculateFitScale]);
+  }, [baseDimensions, calculateFitScale]);
 
   // Smooth scroll helper for scroll mode
   const scrollToPage = (page: number) => {
@@ -201,6 +195,31 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleNextPage, handlePrevPage]);
 
+  // Direct touch drag scrolling handler for mobile devices
+  const touchStartY = useRef<number>(0);
+  const touchStartScrollTop = useRef<number>(0);
+  const isTouchDragging = useRef<boolean>(false);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1 && scrollContainerRef.current) {
+      touchStartY.current = e.touches[0].clientY;
+      touchStartScrollTop.current = scrollContainerRef.current.scrollTop;
+      isTouchDragging.current = true;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (isTouchDragging.current && e.touches.length === 1 && scrollContainerRef.current) {
+      const currentY = e.touches[0].clientY;
+      const deltaY = touchStartY.current - currentY;
+      scrollContainerRef.current.scrollTop = touchStartScrollTop.current + deltaY;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    isTouchDragging.current = false;
+  };
+
   return (
     <div
       ref={containerRef}
@@ -214,8 +233,6 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
         scale={scale}
         isFullscreen={isFullscreen}
         showThumbnails={showThumbnails}
-        viewMode={viewMode}
-        spreadMode={spreadMode}
         onPrevPage={handlePrevPage}
         onNextPage={handleNextPage}
         onFirstPage={handleFirstPage}
@@ -228,8 +245,6 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
         onToggleFullscreen={handleToggleFullscreen}
         onToggleThumbnails={() => setShowThumbnails(v => !v)}
         onToggleSearch={() => setShowSearch(v => !v)}
-        onToggleViewMode={() => setViewMode(m => (m === 'scroll' ? 'flipbook' : 'scroll'))}
-        onToggleSpreadMode={() => setSpreadMode(m => (m === 'double' ? 'single' : 'double'))}
       />
 
       {/* Lazy Virtualized Thumbnails Sidebar */}
@@ -266,12 +281,16 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
       <main
         ref={scrollContainerRef}
         onScroll={handleScroll}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         style={{
           WebkitOverflowScrolling: 'touch',
           touchAction: 'pan-y',
           overscrollBehaviorY: 'contain',
         }}
-        className="flex-1 min-h-0 w-full overflow-y-scroll overflow-x-hidden pt-16 pb-24 px-1 sm:px-4 scrollbar-thin flex justify-center touch-pan-y"
+        className="flex-1 min-h-0 w-full overflow-y-scroll overflow-x-hidden pt-16 pb-6 sm:pb-24 px-1 sm:px-4 scrollbar-thin flex justify-center touch-pan-y"
       >
         <div className="w-full flex flex-col items-center mx-auto my-2 sm:my-4 max-w-full sm:max-w-fit shadow-2xl rounded-lg sm:rounded-xl overflow-hidden border border-slate-800/80 bg-white">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
