@@ -17,7 +17,8 @@
   .stf__parent,
   .stf__wrapper,
   .stf__item,
-  .stf__block {
+  .stf__block,
+  .stf__canvas {
     background-color: transparent !important;
     background: transparent !important;
     padding: 0 !important;
@@ -30,18 +31,19 @@
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    width: 100% !important;
-    height: 100% !important;
-    max-width: 100vw !important;
-    max-height: 100% !important;
+    margin: 0 auto !important;
   }
 
   .stf__wrapper {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    max-width: 100vw !important;
-    max-height: 100% !important;
+    margin: 0 auto !important;
+  }
+
+  .stf__canvas {
+    display: block !important;
+    margin: 0 auto !important;
   }
 
   /* Custom scrollbars */

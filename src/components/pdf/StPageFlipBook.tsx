@@ -215,8 +215,8 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
         usePortrait: isMobile || isLandscape,
         startPage: Math.max(0, currentPage - 1),
         startZIndex: 5,
-        autoSize: true,
-        showCover: false, // Clean borderless fit without artificial white cover margins
+        autoSize: false, // Prevents PageFlip from setting 100% width canvas and filling outer space with white
+        showCover: false,
         mobileScrollSupport: false,
         useMouseEvents: true,
         swipeDistance: 30,
