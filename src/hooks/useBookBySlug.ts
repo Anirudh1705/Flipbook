@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Book } from '../types/book';
+import { isFirebaseConfigured, getBooksFromFirestore } from '../lib/firebase';
 import { supabase, isSupabaseConfigured, getLocalBooks } from '../lib/supabase';
 
 export function useBookBySlug(slug?: string) {
@@ -24,12 +25,35 @@ export function useBookBySlug(slug?: string) {
       const parsedNum = parseInt(cleanSlug.replace(/^book-?/i, ''), 10);
 
       try {
+        // 1. Firebase Firestore
+        if (isFirebaseConfigured) {
+          const firestoreBooks = await getBooksFromFirestore();
+          const found = firestoreBooks.find(b => {
+            const bSlug = b.slug.toLowerCase();
+            const bNum = b.book_number;
+            const bNumPadded = String(bNum).padStart(2, '0');
+            return (
+              bSlug === cleanSlug ||
+              `book-${bNumPadded}` === cleanSlug ||
+              `book-${bNum}` === cleanSlug ||
+              String(bNum) === cleanSlug ||
+              bNumPadded === cleanSlug ||
+              (!isNaN(parsedNum) && bNum === parsedNum)
+            );
+          });
+
+          if (found && isMounted) {
+            setBook(found);
+            setLoading(false);
+            return;
+          }
+        }
+
+        // 2. Supabase
         if (isSupabaseConfigured && supabase) {
-          // 1. Try match by exact slug
           const query = supabase.from('books').select('*').eq('slug', cleanSlug);
           let { data } = await query.maybeSingle();
 
-          // 2. If not found and slug is numeric / book-01 format, try match by book_number
           if (!data && !isNaN(parsedNum)) {
             const numQuery = await supabase.from('books').select('*').eq('book_number', parsedNum).maybeSingle();
             data = numQuery.data;
@@ -42,7 +66,7 @@ export function useBookBySlug(slug?: string) {
           }
         }
 
-        // Fallback or search in local dataset
+        // 3. Fallback to local dataset / IndexedDB
         const localBooks = getLocalBooks();
         const found = localBooks.find(b => {
           const bSlug = b.slug.toLowerCase();

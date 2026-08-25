@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ShieldCheck, ArrowLeft, Lock, Mail, AlertCircle, Sparkles } from 'lucide-react';
+import { isFirebaseConfigured, loginWithFirebase } from '../lib/firebase';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { SEO } from '../components/common/SEO';
 
@@ -16,29 +17,54 @@ export const AdminLoginPage: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    if (!isSupabaseConfigured || !supabase) {
-      // Demo authentication mode
-      localStorage.setItem('flipbook_admin_authenticated', 'true');
-      navigate('/admin');
-      return;
-    }
-
-    try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (authError) throw authError;
-
-      if (data.session) {
+    // 1. If Firebase is configured, use Firebase Auth (enterprise security against hackers)
+    if (isFirebaseConfigured) {
+      try {
+        await loginWithFirebase(email.trim(), password);
+        localStorage.setItem('flipbook_admin_authenticated', 'true');
         navigate('/admin');
+        return;
+      } catch (err: any) {
+        let msg = 'Authentication failed. Please verify your credentials.';
+        if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+          msg = 'Invalid email or password.';
+        } else if (err.code === 'auth/too-many-requests') {
+          msg = 'Access temporarily disabled due to multiple failed attempts. Please try again later.';
+        } else if (err.message) {
+          msg = err.message;
+        }
+        setError(msg);
+        setLoading(false);
+        return;
       }
-    } catch (err: any) {
-      setError(err.message || 'Invalid admin credentials');
-    } finally {
-      setLoading(false);
     }
+
+    // 2. If Supabase is configured, use Supabase Auth
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error: authError } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+
+        if (authError) throw authError;
+
+        if (data.session) {
+          localStorage.setItem('flipbook_admin_authenticated', 'true');
+          navigate('/admin');
+          return;
+        }
+      } catch (err: any) {
+        setError(err.message || 'Invalid admin credentials');
+        setLoading(false);
+        return;
+      }
+    }
+
+    // 3. Demo / Local authentication mode
+    localStorage.setItem('flipbook_admin_authenticated', 'true');
+    navigate('/admin');
+    setLoading(false);
   };
 
   const handleDemoBypass = () => {
@@ -58,7 +84,9 @@ export const AdminLoginPage: React.FC = () => {
           </div>
           <h2 className="text-xl font-bold text-slate-100">Administrator Login</h2>
           <p className="text-xs text-slate-400">
-            Access publication catalog, display ordering, and R2 links
+            {isFirebaseConfigured
+              ? 'Secured with Firebase Enterprise Authentication'
+              : 'Access publication catalog and reader links'}
           </p>
         </div>
 

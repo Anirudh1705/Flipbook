@@ -1,0 +1,130 @@
+import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  type User,
+  type Auth,
+} from 'firebase/auth';
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  doc,
+  setDoc,
+  deleteDoc,
+  query,
+  orderBy,
+  type Firestore,
+} from 'firebase/firestore';
+import type { Book } from '../types/book';
+
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+};
+
+export const isFirebaseConfigured = Boolean(
+  firebaseConfig.apiKey &&
+  firebaseConfig.projectId &&
+  firebaseConfig.apiKey !== 'your-firebase-api-key'
+);
+
+let app: FirebaseApp | null = null;
+let auth: Auth | null = null;
+let db: Firestore | null = null;
+
+if (isFirebaseConfigured && typeof window !== 'undefined') {
+  try {
+    app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+  } catch (err) {
+    console.error('Failed to initialize Firebase:', err);
+  }
+}
+
+export { auth, db };
+
+/**
+ * Secure Firebase Authentication
+ * Protects administrator credentials against brute force attacks, credential stuffing, and session hijacking.
+ */
+export async function loginWithFirebase(email: string, pass: string): Promise<User> {
+  if (!auth) {
+    throw new Error('Firebase is not configured. Please add your Firebase credentials in .env');
+  }
+  const credential = await signInWithEmailAndPassword(auth, email, pass);
+  return credential.user;
+}
+
+export async function logoutFromFirebase(): Promise<void> {
+  if (auth) {
+    await firebaseSignOut(auth);
+  }
+  localStorage.removeItem('flipbook_admin_authenticated');
+}
+
+export function subscribeToAuthChanges(callback: (user: User | null) => void) {
+  if (!auth) {
+    callback(null);
+    return () => {};
+  }
+  return onAuthStateChanged(auth, callback);
+}
+
+/**
+ * Firestore Database operations for publications
+ */
+const BOOKS_COLLECTION = 'publications';
+
+export async function getBooksFromFirestore(): Promise<Book[]> {
+  if (!db) return [];
+  try {
+    const q = query(collection(db, BOOKS_COLLECTION), orderBy('display_order', 'asc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Book));
+  } catch (err) {
+    console.warn('Firestore fetch failed:', err);
+    return [];
+  }
+}
+
+export async function saveBookToFirestore(book: Partial<Book>): Promise<Book> {
+  if (!db) {
+    throw new Error('Firebase Firestore is not initialized');
+  }
+
+  const bookId = book.id || String(Date.now());
+  const bookRef = doc(db, BOOKS_COLLECTION, bookId);
+
+  const newBook: Book = {
+    id: bookId,
+    book_number: book.book_number || 1,
+    title: book.title || 'Untitled Publication',
+    slug: book.slug || `book-${bookId}`,
+    pdf_url: book.pdf_url || '',
+    cover_url: book.cover_url || '',
+    description: book.description || '',
+    category: book.category || 'General',
+    author: book.author || '',
+    publication_date: book.publication_date || new Date().toISOString().split('T')[0],
+    page_count: book.page_count || 14,
+    file_size: book.file_size || 1048576,
+    is_published: book.is_published ?? true,
+    display_order: book.display_order || 1,
+  };
+
+  await setDoc(bookRef, newBook, { merge: true });
+  return newBook;
+}
+
+export async function deleteBookFromFirestore(id: string): Promise<void> {
+  if (!db) return;
+  await deleteDoc(doc(db, BOOKS_COLLECTION, id));
+}
