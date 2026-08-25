@@ -1,7 +1,8 @@
-import { useEffect, useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { PageFlip } from 'page-flip';
+import { PdfPageCanvas } from './PdfPageCanvas';
 import { playPageTurnSound } from '../../lib/pageAudio';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export interface TurnFlipbookHandle {
   flipNext: () => void;
@@ -33,248 +34,230 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
     ref
   ) => {
     const containerRef = useRef<HTMLDivElement | null>(null);
-    const bookRef = useRef<HTMLDivElement | null>(null);
-    const pageFlipInstanceRef = useRef<PageFlip | null>(null);
-    const renderedPagesRef = useRef<Set<number>>(new Set());
-    const renderingPagesRef = useRef<Set<number>>(new Set());
+    const [isFlipping, setIsFlipping] = useState<'forward' | 'backward' | null>(null);
+    const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
 
-    // Page Dimensions based on scale
-    const baseW = Math.max(300, baseDimensions.width);
-    const baseH = Math.max(400, baseDimensions.height);
-    const displayWidth = Math.floor(baseW * scale);
-    const displayHeight = Math.floor(baseH * scale);
+    // Responsive mobile detector
+    useEffect(() => {
+      const handleResize = () => {
+        setIsMobile(window.innerWidth < 768);
+      };
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-    const containerWidth = isMobile ? displayWidth : displayWidth * 2;
+    // Determine left and right page numbers in book spread
+    // Page 1 is the front cover (single right page on desktop, single page on mobile)
+    let leftPageNum: number | null = null;
+    let rightPageNum: number | null = null;
+
+    if (isMobile) {
+      rightPageNum = currentPage;
+    } else {
+      if (currentPage === 1) {
+        leftPageNum = null;
+        rightPageNum = 1;
+      } else if (currentPage >= totalPages && totalPages % 2 === 0) {
+        leftPageNum = totalPages;
+        rightPageNum = null;
+      } else {
+        const evenLeft = currentPage % 2 === 0 ? currentPage : currentPage - 1;
+        leftPageNum = evenLeft <= totalPages ? evenLeft : null;
+        rightPageNum = evenLeft + 1 <= totalPages ? evenLeft + 1 : null;
+      }
+    }
+
+    const goToNext = useCallback(() => {
+      if (isFlipping) return;
+      const step = isMobile || currentPage === 1 ? 1 : 2;
+      const nextP = Math.min(totalPages, currentPage + step);
+      if (nextP !== currentPage) {
+        setIsFlipping('forward');
+        playPageTurnSound();
+        setTimeout(() => {
+          onPageChange(nextP);
+          setIsFlipping(null);
+        }, 320);
+      }
+    }, [isFlipping, isMobile, currentPage, totalPages, onPageChange]);
+
+    const goToPrev = useCallback(() => {
+      if (isFlipping) return;
+      const step = isMobile || currentPage <= 2 ? 1 : 2;
+      const prevP = Math.max(1, currentPage - step);
+      if (prevP !== currentPage) {
+        setIsFlipping('backward');
+        playPageTurnSound();
+        setTimeout(() => {
+          onPageChange(prevP);
+          setIsFlipping(null);
+        }, 320);
+      }
+    }, [isFlipping, isMobile, currentPage, onPageChange]);
 
     // Expose control methods to parent toolbar
     useImperativeHandle(
       ref,
       () => ({
-        flipNext: () => {
-          if (pageFlipInstanceRef.current) {
-            playPageTurnSound();
-            pageFlipInstanceRef.current.flipNext('bottom');
-          }
-        },
-        flipPrev: () => {
-          if (pageFlipInstanceRef.current) {
-            playPageTurnSound();
-            pageFlipInstanceRef.current.flipPrev('bottom');
-          }
-        },
+        flipNext: goToNext,
+        flipPrev: goToPrev,
         flipToPage: (page: number) => {
-          if (pageFlipInstanceRef.current) {
+          if (page >= 1 && page <= totalPages && page !== currentPage) {
             playPageTurnSound();
-            pageFlipInstanceRef.current.turnToPage(Math.max(0, Math.min(page - 1, totalPages - 1)));
+            onPageChange(page);
           }
         },
       }),
-      [totalPages]
+      [goToNext, goToPrev, totalPages, currentPage, onPageChange]
     );
 
-    // Direct GPU Canvas rendering for individual page - executes in < 25ms
-    const renderPageDirect = useCallback(
-      async (pageNum: number) => {
-        if (!pdfDocument || pageNum < 1 || pageNum > totalPages) return;
-        if (renderedPagesRef.current.has(pageNum) || renderingPagesRef.current.has(pageNum)) return;
-
-        const canvas = document.getElementById(`flip-canvas-${pageNum}`) as HTMLCanvasElement;
-        if (!canvas) return;
-
-        renderingPagesRef.current.add(pageNum);
-
-        try {
-          const page = await pdfDocument.getPage(pageNum);
-          const unscaledVp = page.getViewport({ scale: 1.0 });
-
-          if (onDimensionsLoaded && pageNum === 1) {
-            onDimensionsLoaded({
-              width: unscaledVp.width,
-              height: unscaledVp.height,
-            });
-          }
-
-          const dpr = Math.min(window.devicePixelRatio || 1, 2);
-          const renderScale = (displayWidth / unscaledVp.width) * dpr;
-          const viewport = page.getViewport({ scale: renderScale });
-
-          canvas.width = Math.floor(viewport.width);
-          canvas.height = Math.floor(viewport.height);
-          canvas.style.width = `${displayWidth}px`;
-          canvas.style.height = `${displayHeight}px`;
-
-          const ctx = canvas.getContext('2d', { alpha: false });
-          if (!ctx) return;
-
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-          await (page as any).render({
-            canvasContext: ctx,
-            viewport: viewport,
-            canvas: canvas,
-          }).promise;
-
-          renderedPagesRef.current.add(pageNum);
-        } catch (err: any) {
-          if (err.name !== 'RenderingCancelledException') {
-            console.warn(`Error rendering page ${pageNum}:`, err);
-          }
-        } finally {
-          renderingPagesRef.current.delete(pageNum);
-        }
-      },
-      [pdfDocument, totalPages, displayWidth, displayHeight, onDimensionsLoaded]
-    );
-
-    // Render active and surrounding pages dynamically
-    const renderSurroundingPages = useCallback(
-      (targetPage: number) => {
-        const pages = [
-          targetPage - 2,
-          targetPage - 1,
-          targetPage,
-          targetPage + 1,
-          targetPage + 2,
-          targetPage + 3,
-        ].filter(p => p >= 1 && p <= totalPages);
-
-        pages.forEach(p => {
-          renderPageDirect(p);
-        });
-      },
-      [totalPages, renderPageDirect]
-    );
-
-    // Initialize PageFlip engine immediately on mount (0ms delay)
+    // Keyboard Arrow Navigation
     useEffect(() => {
-      const bookEl = bookRef.current;
-      if (!bookEl || !pdfDocument || totalPages === 0) return;
-
-      // Clean up previous instance
-      if (pageFlipInstanceRef.current) {
-        try {
-          pageFlipInstanceRef.current.destroy();
-        } catch {}
-        pageFlipInstanceRef.current = null;
-      }
-      renderedPagesRef.current.clear();
-      renderingPagesRef.current.clear();
-
-      const isMobileScreen = window.innerWidth < 768;
-
-      const pageFlip = new PageFlip(bookEl, {
-        width: displayWidth,
-        height: displayHeight,
-        size: 'fixed',
-        minWidth: 200,
-        maxWidth: 1600,
-        minHeight: 300,
-        maxHeight: 2000,
-        maxShadowOpacity: 0.45,
-        showCover: false,
-        mobileScrollSupport: false,
-        flippingTime: 550,
-        usePortrait: isMobileScreen,
-        startPage: Math.max(0, Math.min(currentPage - 1, totalPages - 1)),
-        drawShadow: true,
-        autoSize: true,
-        useMouseEvents: true,
-        showPageCorners: true,
-        swipeDistance: 25,
-      });
-
-      const pageElements = bookEl.querySelectorAll<HTMLElement>('.page');
-      if (pageElements.length > 0) {
-        pageFlip.loadFromHTML(pageElements);
-        pageFlipInstanceRef.current = pageFlip;
-
-        // Render initial active pages instantly
-        renderSurroundingPages(currentPage);
-
-        // Preload upcoming pages smoothly
-        setTimeout(() => {
-          for (let p = 1; p <= Math.min(totalPages, 8); p++) {
-            renderPageDirect(p);
-          }
-        }, 100);
-
-        // Event listeners
-        pageFlip.on('flip', (e: any) => {
-          const newPageIndex = typeof e.data === 'number' ? e.data : 0;
-          const newPageNumber = newPageIndex + 1;
-          playPageTurnSound();
-          onPageChange(newPageNumber);
-          renderSurroundingPages(newPageNumber);
-        });
-
-        pageFlip.on('changeState', (e: any) => {
-          if (e.data === 'flipping') {
-            playPageTurnSound();
-          }
-        });
-      }
-
-      return () => {
-        if (pageFlipInstanceRef.current) {
-          try {
-            pageFlipInstanceRef.current.destroy();
-          } catch {}
-          pageFlipInstanceRef.current = null;
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+          goToNext();
+        } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+          goToPrev();
         }
       };
-    }, [pdfDocument, displayWidth, displayHeight, totalPages, renderSurroundingPages, renderPageDirect, onPageChange, currentPage]);
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [goToNext, goToPrev]);
 
-    // Keep surrounding pages loaded when currentPage changes
-    useEffect(() => {
-      renderSurroundingPages(currentPage);
-    }, [currentPage, renderSurroundingPages]);
+    // Touch Swipe Gesture Tracking for Mobile
+    const touchStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+    const handleTouchStart = (e: React.TouchEvent) => {
+      if (e.touches.length === 1) {
+        touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+    };
+    const handleTouchEnd = (e: React.TouchEvent) => {
+      if (e.changedTouches.length === 1) {
+        const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
+        const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
+        if (Math.abs(deltaX) > 40 && deltaY < 80) {
+          if (deltaX < 0) {
+            goToNext();
+          } else {
+            goToPrev();
+          }
+        }
+      }
+    };
 
     return (
       <div
         ref={containerRef}
-        className="relative w-full h-full flex items-center justify-center select-none overflow-visible p-2 sm:p-6"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="relative w-full h-full flex items-center justify-center select-none overflow-visible p-2 sm:p-6 perspective-2000"
       >
+        {/* Previous Page Navigation Button */}
+        {currentPage > 1 && (
+          <button
+            onClick={goToPrev}
+            className="absolute left-2 sm:left-6 z-30 p-2.5 sm:p-3.5 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/80 shadow-2xl backdrop-blur-md transition-all hover:scale-105 active:scale-95 group"
+            title="Previous Page (Left Arrow)"
+          >
+            <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 group-hover:-translate-x-0.5 transition-transform" />
+          </button>
+        )}
+
+        {/* 3D Book Spread Shell */}
         <div
-          ref={bookRef}
-          className="turnjs-flipbook-container shadow-2xl rounded-lg mx-auto"
-          style={{
-            width: `${containerWidth}px`,
-            height: `${displayHeight}px`,
-            minHeight: '280px',
-          }}
+          className={`relative flex items-center justify-center transition-transform duration-300 ${
+            isFlipping === 'forward'
+              ? 'scale-[0.99] rotate-y-[-2deg]'
+              : isFlipping === 'backward'
+              ? 'scale-[0.99] rotate-y-[2deg]'
+              : 'scale-100'
+          }`}
+          style={{ transformStyle: 'preserve-3d' }}
         >
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
+          {/* Left Page (Desktop Spread) */}
+          {!isMobile && (
             <div
-              key={pageNum}
-              className="page bg-white overflow-hidden"
-              data-density="soft"
+              className={`relative bg-white shadow-2xl overflow-hidden transition-all duration-300 rounded-l-md border-r border-slate-200/50 ${
+                leftPageNum ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              }`}
               style={{
-                width: `${displayWidth}px`,
-                height: `${displayHeight}px`,
-                backgroundColor: '#ffffff',
+                boxShadow: leftPageNum ? '-12px 18px 35px -8px rgba(0, 0, 0, 0.65)' : 'none',
               }}
             >
-              <div
-                className="page-content relative w-full h-full flex items-center justify-center bg-white overflow-hidden"
-                style={{
-                  width: `${displayWidth}px`,
-                  height: `${displayHeight}px`,
-                }}
-              >
-                <canvas
-                  id={`flip-canvas-${pageNum}`}
-                  className="block bg-white"
+              {leftPageNum ? (
+                <>
+                  <PdfPageCanvas
+                    pdfDocument={pdfDocument}
+                    pageNumber={leftPageNum}
+                    scale={scale}
+                    side="left"
+                    onPageLoaded={onDimensionsLoaded}
+                  />
+                  {/* Spine Depth Lighting Gradient */}
+                  <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-black/25 via-black/5 to-transparent pointer-events-none" />
+                </>
+              ) : (
+                <div
                   style={{
-                    width: `${displayWidth}px`,
-                    height: `${displayHeight}px`,
+                    width: `${Math.floor(baseDimensions.width * scale)}px`,
+                    height: `${Math.floor(baseDimensions.height * scale)}px`,
                   }}
                 />
-              </div>
+              )}
             </div>
-          ))}
+          )}
+
+          {/* Center Book Spine Divider on Spreads */}
+          {!isMobile && leftPageNum && rightPageNum && (
+            <div className="w-[2px] self-stretch bg-slate-400/40 z-20 shadow-md" />
+          )}
+
+          {/* Right Page (Desktop & Mobile Single View) */}
+          <div
+            className={`relative bg-white shadow-2xl overflow-hidden transition-all duration-300 ${
+              isMobile ? 'rounded-md shadow-2xl' : 'rounded-r-md'
+            } ${rightPageNum ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            style={{
+              boxShadow: isMobile
+                ? '0 20px 40px -10px rgba(0, 0, 0, 0.7)'
+                : '12px 18px 35px -8px rgba(0, 0, 0, 0.65)',
+            }}
+          >
+            {rightPageNum ? (
+              <>
+                <PdfPageCanvas
+                  pdfDocument={pdfDocument}
+                  pageNumber={rightPageNum}
+                  scale={scale}
+                  side={isMobile ? 'single' : 'right'}
+                  onPageLoaded={onDimensionsLoaded}
+                />
+                {/* Spine Depth Lighting Gradient on Desktop */}
+                {!isMobile && (
+                  <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-black/25 via-black/5 to-transparent pointer-events-none" />
+                )}
+              </>
+            ) : (
+              <div
+                style={{
+                  width: `${Math.floor(baseDimensions.width * scale)}px`,
+                  height: `${Math.floor(baseDimensions.height * scale)}px`,
+                }}
+              />
+            )}
+          </div>
         </div>
+
+        {/* Next Page Navigation Button */}
+        {currentPage < totalPages && (
+          <button
+            onClick={goToNext}
+            className="absolute right-2 sm:right-6 z-30 p-2.5 sm:p-3.5 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/80 shadow-2xl backdrop-blur-md transition-all hover:scale-105 active:scale-95 group"
+            title="Next Page (Right Arrow)"
+          >
+            <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        )}
       </div>
     );
   }
