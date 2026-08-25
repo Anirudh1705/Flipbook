@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { Book } from '../../types/book';
 import { RealisticPageFlip, type RealisticPageFlipHandle } from './RealisticPageFlip';
+import { PdfScrollPage } from './PdfScrollPage';
 import { PdfToolbar } from './PdfToolbar';
 import { PdfThumbnails } from './PdfThumbnails';
 import { PdfSearchModal } from './PdfSearchModal';
@@ -14,9 +15,12 @@ interface FlipbookViewerProps {
 
 export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocument }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const pageFlipRef = useRef<RealisticPageFlipHandle | null>(null);
   const totalPages = pdfDocument.numPages;
 
+  const [viewMode, setViewMode] = useState<'flipbook' | 'scroll'>('flipbook');
+  const [spreadMode, setSpreadMode] = useState<'single' | 'double'>('double');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [scale, setScale] = useState<number>(0.9);
@@ -41,19 +45,31 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
     const availWidth = Math.max(280, container.clientWidth - (isMobileView ? 24 : 64));
     const availHeight = Math.max(300, container.clientHeight - (isMobileView ? 110 : 140));
 
-    if (isMobileView) {
-      const fitW = availWidth / baseDimensions.width;
-      const fitH = availHeight / baseDimensions.height;
-      const optimal = Math.min(fitW, fitH, 1.1);
-      setScale(Math.max(0.35, Number(optimal.toFixed(2))));
+    if (viewMode === 'scroll') {
+      if (isMobileView) {
+        const optimal = availWidth / baseDimensions.width;
+        setScale(Math.max(0.35, Math.min(1.15, Number(optimal.toFixed(2)))));
+      } else {
+        const targetColWidth = Math.min(availWidth - 24, 920);
+        const optimal = targetColWidth / baseDimensions.width;
+        setScale(Math.max(0.4, Math.min(1.4, Number(optimal.toFixed(2)))));
+      }
     } else {
-      // 2-page spread on desktop
-      const fitW = availWidth / (baseDimensions.width * 2);
-      const fitH = availHeight / baseDimensions.height;
-      const optimal = Math.min(fitW, fitH, 1.3);
-      setScale(Math.max(0.4, Number(optimal.toFixed(2))));
+      // 3D Flipbook mode
+      if (isMobileView || spreadMode === 'single') {
+        const fitW = availWidth / baseDimensions.width;
+        const fitH = availHeight / baseDimensions.height;
+        const optimal = Math.min(fitW, fitH, 1.1);
+        setScale(Math.max(0.35, Number(optimal.toFixed(2))));
+      } else {
+        // 2-page spread on desktop
+        const fitW = availWidth / (baseDimensions.width * 2);
+        const fitH = availHeight / baseDimensions.height;
+        const optimal = Math.min(fitW, fitH, 1.3);
+        setScale(Math.max(0.4, Number(optimal.toFixed(2))));
+      }
     }
-  }, [baseDimensions]);
+  }, [baseDimensions, viewMode, spreadMode]);
 
   useEffect(() => {
     calculateFitScale();
@@ -64,19 +80,69 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
     return () => window.removeEventListener('resize', handleResize);
   }, [calculateFitScale]);
 
+  // Smooth scroll helper for scroll mode
+  const scrollToPage = useCallback((page: number) => {
+    const container = scrollContainerRef.current;
+    const el = document.getElementById(`page-container-${page}`);
+    if (container && el) {
+      const containerRect = container.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const relativeTop = elRect.top - containerRect.top + container.scrollTop;
+      container.scrollTo({ top: Math.max(0, relativeTop - 70), behavior: 'smooth' });
+    }
+  }, []);
+
+  // Live scroll position listener for continuous scroll mode
+  const handleScroll = useCallback(() => {
+    if (viewMode !== 'scroll') return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const containerMidY = containerRect.top + containerRect.height / 2;
+
+    for (let p = 1; p <= totalPages; p++) {
+      const el = document.getElementById(`page-container-${p}`);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= containerMidY && rect.bottom >= containerMidY) {
+          setCurrentPage(p);
+          break;
+        }
+      }
+    }
+  }, [totalPages, viewMode]);
+
   // Page Navigation Handlers
   const handleGoToPage = (page: number) => {
     const clamped = Math.max(1, Math.min(page, totalPages));
-    pageFlipRef.current?.flipToPage(clamped);
+    setCurrentPage(clamped);
+    if (viewMode === 'flipbook') {
+      pageFlipRef.current?.flipToPage(clamped);
+    } else {
+      scrollToPage(clamped);
+    }
   };
 
   const handleNextPage = useCallback(() => {
-    pageFlipRef.current?.flipNext();
-  }, []);
+    if (viewMode === 'flipbook') {
+      pageFlipRef.current?.flipNext();
+    } else {
+      const next = Math.min(currentPage + 1, totalPages);
+      setCurrentPage(next);
+      scrollToPage(next);
+    }
+  }, [viewMode, currentPage, totalPages, scrollToPage]);
 
   const handlePrevPage = useCallback(() => {
-    pageFlipRef.current?.flipPrev();
-  }, []);
+    if (viewMode === 'flipbook') {
+      pageFlipRef.current?.flipPrev();
+    } else {
+      const prev = Math.max(currentPage - 1, 1);
+      setCurrentPage(prev);
+      scrollToPage(prev);
+    }
+  }, [viewMode, currentPage, scrollToPage]);
 
   const handleFirstPage = () => handleGoToPage(1);
   const handleLastPage = () => handleGoToPage(totalPages);
@@ -151,6 +217,8 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
         scale={scale}
         isFullscreen={isFullscreen}
         showThumbnails={showThumbnails}
+        viewMode={viewMode}
+        spreadMode={spreadMode}
         onPrevPage={handlePrevPage}
         onNextPage={handleNextPage}
         onFirstPage={handleFirstPage}
@@ -163,6 +231,8 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
         onToggleFullscreen={handleToggleFullscreen}
         onToggleThumbnails={() => setShowThumbnails(v => !v)}
         onToggleSearch={() => setShowSearch(v => !v)}
+        onToggleViewMode={() => setViewMode(m => (m === 'flipbook' ? 'scroll' : 'flipbook'))}
+        onToggleSpreadMode={() => setSpreadMode(m => (m === 'double' ? 'single' : 'double'))}
       />
 
       {/* Lazy Virtualized Thumbnails Sidebar */}
@@ -195,20 +265,46 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
         onGoToPage={handleGoToPage}
       />
 
-      {/* Main 3D Realistic Page-Flipping Stage */}
-      <main className="flex-1 min-h-0 w-full h-full relative flex items-center justify-center pt-14 pb-16 sm:pb-20 overflow-hidden">
-        <RealisticPageFlip
-          ref={pageFlipRef}
-          pdfDocument={pdfDocument}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          scale={scale}
-          isDual={!isMobile}
-          baseDimensions={baseDimensions}
-          onPageChange={newPage => setCurrentPage(newPage)}
-          onPageLoaded={dims => setBaseDimensions(dims)}
-        />
-      </main>
+      {/* Stage: 3D Flipbook or Continuous Vertical Scroll */}
+      {viewMode === 'flipbook' ? (
+        <main className="flex-1 min-h-0 w-full h-full relative flex items-center justify-center pt-14 pb-16 sm:pb-20 overflow-hidden">
+          <RealisticPageFlip
+            ref={pageFlipRef}
+            pdfDocument={pdfDocument}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            scale={scale}
+            isDual={!isMobile && spreadMode === 'double'}
+            baseDimensions={baseDimensions}
+            onPageChange={newPage => setCurrentPage(newPage)}
+            onPageLoaded={dims => setBaseDimensions(dims)}
+          />
+        </main>
+      ) : (
+        <main
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-y',
+          }}
+          className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden pt-16 pb-20 px-1 sm:px-4 flex justify-center"
+        >
+          <div className="w-full flex flex-col items-center mx-auto my-2 sm:my-4 max-w-full sm:max-w-fit shadow-2xl rounded-lg sm:rounded-xl overflow-hidden border border-slate-800/80 bg-white">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
+              <PdfScrollPage
+                key={pageNum}
+                pdfDocument={pdfDocument}
+                pageNumber={pageNum}
+                scale={scale}
+                baseDimensions={baseDimensions}
+                onVisible={p => setCurrentPage(p)}
+                onDimensionsLoaded={dims => setBaseDimensions(dims)}
+              />
+            ))}
+          </div>
+        </main>
+      )}
     </div>
   );
 };

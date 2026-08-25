@@ -15,6 +15,9 @@ import {
   BookOpen,
   Sparkles,
   Layers,
+  Rows3,
+  Columns2,
+  Square,
 } from 'lucide-react';
 import type { Book } from '../../types/book';
 
@@ -25,6 +28,8 @@ interface PdfToolbarProps {
   scale: number;
   isFullscreen: boolean;
   showThumbnails: boolean;
+  viewMode: 'flipbook' | 'scroll';
+  spreadMode?: 'single' | 'double';
   onPrevPage: () => void;
   onNextPage: () => void;
   onFirstPage: () => void;
@@ -37,6 +42,8 @@ interface PdfToolbarProps {
   onToggleFullscreen: () => void;
   onToggleThumbnails: () => void;
   onToggleSearch: () => void;
+  onToggleViewMode: () => void;
+  onToggleSpreadMode?: () => void;
 }
 
 export const PdfToolbar: React.FC<PdfToolbarProps> = ({
@@ -46,6 +53,8 @@ export const PdfToolbar: React.FC<PdfToolbarProps> = ({
   scale,
   isFullscreen,
   showThumbnails,
+  viewMode,
+  spreadMode = 'double',
   onPrevPage,
   onNextPage,
   onFirstPage,
@@ -58,6 +67,8 @@ export const PdfToolbar: React.FC<PdfToolbarProps> = ({
   onToggleFullscreen,
   onToggleThumbnails,
   onToggleSearch,
+  onToggleViewMode,
+  onToggleSpreadMode,
 }) => {
   const [jumpInput, setJumpInput] = useState<string>('');
   const [showJumpDialog, setShowJumpDialog] = useState<boolean>(false);
@@ -115,6 +126,37 @@ export const PdfToolbar: React.FC<PdfToolbarProps> = ({
 
         {/* Right Actions */}
         <div className="flex items-center gap-1 sm:gap-2">
+          {/* Continuous Scroll vs 3D Flipbook Mode Switcher */}
+          <button
+            onClick={onToggleViewMode}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-xs font-medium border border-slate-800 text-brand-400 transition-colors"
+            title={viewMode === 'scroll' ? 'Switch to 3D Page Flip View' : 'Switch to Vertical Scroll View'}
+          >
+            {viewMode === 'scroll' ? (
+              <>
+                <BookOpen className="w-4 h-4" />
+                <span className="hidden md:inline text-[11px]">3D Flipbook</span>
+              </>
+            ) : (
+              <>
+                <Rows3 className="w-4 h-4" />
+                <span className="hidden md:inline text-[11px]">Vertical Scroll</span>
+              </>
+            )}
+          </button>
+
+          {/* Spread Mode Toggle (Single vs Dual Page Spread on Desktop) */}
+          {viewMode === 'flipbook' && onToggleSpreadMode && (
+            <button
+              onClick={onToggleSpreadMode}
+              className="hidden md:flex p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-850 transition-colors"
+              title={spreadMode === 'double' ? 'Switch to Single Page View' : 'Switch to Dual Spread View'}
+              aria-label="Toggle Page Spread View"
+            >
+              {spreadMode === 'double' ? <Columns2 className="w-4 h-4 text-brand-400" /> : <Square className="w-4 h-4" />}
+            </button>
+          )}
+
           {/* Mobile Page Indicator Pill */}
           <span className="sm:hidden px-2.5 py-1 rounded-lg bg-slate-900/90 border border-slate-800 text-[11px] font-mono text-brand-300 font-semibold shadow-sm">
             {currentPage} / {totalPages}
