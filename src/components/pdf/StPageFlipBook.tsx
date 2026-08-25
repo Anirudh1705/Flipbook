@@ -214,7 +214,7 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
       const pageFlip = new PageFlip(bookContainerRef.current, {
         width: bookSize.width,
         height: bookSize.height,
-        size: 'stretch',
+        size: 'fixed',
         minWidth: 100,
         maxWidth: 3000,
         minHeight: 100,

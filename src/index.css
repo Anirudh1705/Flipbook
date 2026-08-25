@@ -13,7 +13,19 @@
     overflow-x: hidden;
   }
 
-  /* StPageFlip responsive centering and full-screen fill */
+  /* StPageFlip transparent container & zero white bars */
+  .stf__parent,
+  .stf__wrapper,
+  .stf__item,
+  .stf__block {
+    background-color: transparent !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
   .stf__parent {
     display: flex !important;
     align-items: center !important;
@@ -21,22 +33,14 @@
     width: 100% !important;
     height: 100% !important;
     max-width: 100vw !important;
-    max-height: 100% !important;
   }
 
   .stf__wrapper {
-    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     max-width: 100vw !important;
     max-height: 100% !important;
-    margin: 0 auto !important;
-    padding: 0 !important;
-    border: 0 !important;
-  }
-
-  .stf__item, .stf__block {
-    padding: 0 !important;
-    margin: 0 !important;
-    border: 0 !important;
   }
 
   /* Custom scrollbars */
