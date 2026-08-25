@@ -3,6 +3,7 @@ declare module 'page-flip' {
     constructor(element: HTMLElement, setting: Record<string, any>);
     loadFromHTML(items: NodeListOf<HTMLElement> | HTMLElement[]): void;
     loadFromImages(imagesPaths: string[]): void;
+    updateFromImages(imagesPaths: string[]): void;
     turnToPage(pageNum: number): void;
     turnToPrevPage(): void;
     turnToNextPage(): void;
