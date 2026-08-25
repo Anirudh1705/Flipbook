@@ -19,6 +19,26 @@ function fetchArchiveMetadata(identifier: string): Promise<any> {
   });
 }
 
+function encodePath(pathname: string): string {
+  let decoded = pathname;
+  try {
+    while (
+      decoded.includes('%20') ||
+      decoded.includes('%25') ||
+      decoded.includes('%28') ||
+      decoded.includes('%29')
+    ) {
+      const prev = decoded;
+      decoded = decodeURIComponent(decoded);
+      if (decoded === prev) break;
+    }
+  } catch {}
+
+  return encodeURI(decoded)
+    .replace(/\(/g, '%28')
+    .replace(/\)/g, '%29');
+}
+
 function streamUrl(
   targetUrl: string,
   clientRange: string | undefined,
@@ -34,6 +54,7 @@ function streamUrl(
   try {
     const parsed = new URL(targetUrl);
     const client = parsed.protocol === 'https:' ? https : http;
+    const safePath = encodePath(parsed.pathname) + (parsed.search || '');
 
     const headers: Record<string, string> = {
       'User-Agent':
@@ -51,7 +72,7 @@ function streamUrl(
         protocol: parsed.protocol,
         hostname: parsed.hostname,
         port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
-        path: parsed.pathname + parsed.search,
+        path: safePath,
         headers,
       },
       proxyRes => {
@@ -122,7 +143,7 @@ export default async function handler(req: any, res: any) {
   }
 
   // Handle nested/double proxy encoding
-  while (rawUrl.includes('api/pdf-proxy?url=')) {
+  while (rawUrl.includes('api/pdf-proxy?url='')) {
     const parts = rawUrl.split(/api\/pdf-proxy\?url=/);
     rawUrl = decodeURIComponent(parts[parts.length - 1]);
   }
