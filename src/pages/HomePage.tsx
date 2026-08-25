@@ -87,14 +87,14 @@ export const HomePage: React.FC = () => {
           </h1>
 
           <p className="text-slate-400 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
-            Each publication is accessible via its unique private URL. Enter your publication ID below or use your direct access link.
+            Each publication is accessible via its unique private URL. Enter your publication ID or slug below to open your reader.
           </p>
         </div>
 
         {/* Access Form */}
         <div className="w-full max-w-md glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-2xl space-y-4 text-left">
           <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider font-mono">
-            Direct Publication ID / Code
+            Publication ID or Direct Slug
           </label>
 
           <form onSubmit={handleAccessSubmit} className="space-y-3">
@@ -103,7 +103,7 @@ export const HomePage: React.FC = () => {
                 type="text"
                 value={accessCode}
                 onChange={e => setAccessCode(e.target.value)}
-                placeholder="e.g. 01, 02, or publication-slug"
+                placeholder="e.g. 01, 02, or your-publication-slug"
                 className="flex-1 px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-slate-100 font-mono text-sm placeholder:text-slate-600 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none"
               />
               <button
@@ -115,31 +115,6 @@ export const HomePage: React.FC = () => {
               </button>
             </div>
           </form>
-
-          {/* Quick Demo Shortcuts */}
-          <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Sample links:</span>
-            <div className="flex gap-1.5">
-              <Link
-                to="/book/01"
-                className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-brand-400 border border-slate-800 font-mono"
-              >
-                /book/01
-              </Link>
-              <Link
-                to="/book/02"
-                className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-brand-400 border border-slate-800 font-mono"
-              >
-                /book/02
-              </Link>
-              <Link
-                to="/book/03"
-                className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-brand-400 border border-slate-800 font-mono"
-              >
-                /book/03
-              </Link>
-            </div>
-          </div>
         </div>
 
         {/* Feature Pill Highlights */}
@@ -164,7 +139,7 @@ export const HomePage: React.FC = () => {
             <CheckCircle2 className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />
             <div>
               <div className="font-semibold text-slate-200">Admin Control</div>
-              <div className="text-[11px] text-slate-500">Central management of all 25+ PDFs</div>
+              <div className="text-[11px] text-slate-500">Add & manage your own publications</div>
             </div>
           </div>
         </div>

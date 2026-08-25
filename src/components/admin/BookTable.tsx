@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { Book } from '../../types/book';
-import { Edit2, Trash2, CheckCircle2, Clock, Copy, Check, ExternalLink } from 'lucide-react';
+import { Edit2, Trash2, CheckCircle2, Clock, Copy, Check, ExternalLink, BookOpen } from 'lucide-react';
 import { formatBytes } from '../../lib/config';
 
 interface BookTableProps {
@@ -30,6 +30,20 @@ export const BookTable: React.FC<BookTableProps> = ({
       setTimeout(() => setCopiedId(null), 2500);
     });
   };
+
+  if (books.length === 0) {
+    return (
+      <div className="glass-panel p-12 rounded-2xl border border-slate-800 text-center space-y-3">
+        <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500 mx-auto">
+          <BookOpen className="w-6 h-6" />
+        </div>
+        <div className="font-bold text-slate-200 text-sm">No Publications Added Yet</div>
+        <p className="text-xs text-slate-400 max-w-sm mx-auto">
+          Click <strong className="text-brand-400">"+ Add New PDF"</strong> above to upload your first publication.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
