@@ -12,7 +12,6 @@ interface LoadingScreenProps {
 
 export const LoadingScreen: React.FC<LoadingScreenProps> = ({
   progress = -1,
-  stageText = 'Preparing document...',
   error = null,
   onRetry,
   title,
@@ -92,13 +91,12 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
           {title && (
             <h3 className="text-base font-semibold text-slate-200 line-clamp-1 mb-1">{title}</h3>
           )}
-          <h2 className="text-xl font-bold text-slate-100">Opening Publication</h2>
-          <p className="text-xs text-slate-400 mt-1 font-mono">{stageText}</p>
+          <h2 className="text-xl font-bold text-slate-100">Loading Publication...</h2>
         </div>
 
         {/* Progress Bar */}
         <div className="space-y-2">
-          <div className="w-full bg-slate-850 h-2.5 rounded-full overflow-hidden border border-slate-800 relative">
+          <div className="w-full bg-slate-850 h-2 rounded-full overflow-hidden border border-slate-800 relative">
             {progress >= 0 ? (
               <div
                 className="h-full bg-gradient-to-r from-brand-500 to-emerald-400 rounded-full transition-all duration-300 shadow-sm shadow-brand-500/50"
@@ -108,15 +106,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
               <div className="h-full w-1/3 bg-gradient-to-r from-brand-500 to-emerald-400 rounded-full animate-[pulse_1.5s_ease-in-out_infinite]" />
             )}
           </div>
-          <div className="flex justify-between items-center text-[11px] text-slate-500 font-mono">
-            <span>Progressive byte streaming</span>
-            <span>{progress >= 0 ? `${progress}%` : 'Loading...'}</span>
-          </div>
         </div>
-
-        <p className="text-xs text-slate-400 italic">
-          Zero full-file download wait. Renders seamlessly as bytes are indexed.
-        </p>
 
         <div className="pt-2 text-[11px] text-slate-500 font-mono">
           Developed by{' '}
