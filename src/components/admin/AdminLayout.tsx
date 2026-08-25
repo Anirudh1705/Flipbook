@@ -2,6 +2,8 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { BookOpen, LogOut, ArrowLeft, ShieldCheck } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
+import { logoutFromFirebase } from '../../lib/firebase';
+import { STORAGE_KEYS } from '../../lib/config';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -15,11 +17,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const navigate = useNavigate();
 
   const handleLogout = async () => {
+    try {
+      await logoutFromFirebase();
+    } catch {}
+
     if (isSupabaseConfigured && supabase) {
-      await supabase.auth.signOut();
+      try {
+        await supabase.auth.signOut();
+      } catch {}
     }
+
     localStorage.removeItem('flipbook_admin_authenticated');
-    navigate('/');
+    localStorage.removeItem(STORAGE_KEYS.ADMIN_USER_EMAIL);
+    navigate('/admin/login');
   };
 
   return (

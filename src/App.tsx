@@ -3,6 +3,7 @@ import { HomePage } from './pages/HomePage';
 import { BookViewerPage } from './pages/BookViewerPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
+import { ProtectedRoute } from './components/admin/ProtectedRoute';
 
 export function App() {
   return (
@@ -14,8 +15,15 @@ export function App() {
         {/* Dedicated high-performance flipbook reader */}
         <Route path="/book/:slug" element={<BookViewerPage />} />
 
-        {/* Administration */}
-        <Route path="/admin" element={<AdminDashboardPage />} />
+        {/* Administration (Protected by Admin Whitelist) */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminDashboardPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/admin/login" element={<AdminLoginPage />} />
 
         {/* Fallback to Home */}
