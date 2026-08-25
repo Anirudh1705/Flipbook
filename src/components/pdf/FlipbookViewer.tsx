@@ -80,13 +80,13 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
         const targetHeight = baseDimensions.height;
 
         if (mode === 'page') {
-          const scaleH = (availHeight - 20) / targetHeight;
-          const scaleW = (availWidth - 20) / targetWidth;
-          const optimal = Math.min(scaleH, scaleW, 1.2);
-          setScale(Math.max(0.4, Number(optimal.toFixed(2))));
+          const scaleH = (availHeight - (isMobile ? 12 : 24)) / targetHeight;
+          const scaleW = (availWidth - (isMobile ? 12 : 32)) / targetWidth;
+          const optimal = Math.min(scaleH, scaleW, isMobile ? 1.05 : 1.2);
+          setScale(Math.max(0.3, Number(optimal.toFixed(2))));
         } else {
-          const optimal = (availWidth - 32) / targetWidth;
-          setScale(Math.max(0.4, Math.min(1.4, Number(optimal.toFixed(2)))));
+          const optimal = (availWidth - (isMobile ? 12 : 32)) / targetWidth;
+          setScale(Math.max(0.3, Math.min(isMobile ? 1.15 : 1.4, Number(optimal.toFixed(2)))));
         }
       }
     },

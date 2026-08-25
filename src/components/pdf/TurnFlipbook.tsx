@@ -134,6 +134,10 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
       [totalPages, renderPdfCanvas]
     );
 
+    // Detect mobile screen mode
+    const isMobileScreen = typeof window !== 'undefined' && window.innerWidth < 768;
+    const containerWidth = isMobileScreen ? displayWidth : displayWidth * 2;
+
     // Initialize PageFlip engine
     useEffect(() => {
       const bookEl = bookRef.current;
@@ -148,26 +152,27 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
       }
       renderedPagesRef.current.clear();
 
-      const isMobileScreen = window.innerWidth < 768;
+      const isMobile = window.innerWidth < 768;
 
       const pageFlip = new PageFlip(bookEl, {
         width: displayWidth,
         height: displayHeight,
         size: 'fixed',
-        minWidth: 280,
+        minWidth: 240,
         maxWidth: 1200,
-        minHeight: 380,
+        minHeight: 340,
         maxHeight: 1600,
         maxShadowOpacity: 0.5,
         showCover: true,
         mobileScrollSupport: false,
-        flippingTime: 600,
-        usePortrait: isMobileScreen,
+        flippingTime: 550,
+        usePortrait: isMobile,
         startPage: Math.max(0, Math.min(currentPage - 1, totalPages - 1)),
         drawShadow: true,
-        autoSize: false,
+        autoSize: true,
         useMouseEvents: true,
         showPageCorners: true,
+        swipeDistance: 25,
       });
 
       const pageElements = bookEl.querySelectorAll<HTMLElement>('.page');
@@ -223,13 +228,13 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
     return (
       <div
         ref={containerRef}
-        className="relative w-full flex items-center justify-center select-none overflow-visible p-2 sm:p-6"
+        className="relative w-full flex items-center justify-center select-none overflow-visible p-1 sm:p-6"
       >
         <div
           ref={bookRef}
-          className="turnjs-flipbook-container shadow-2xl rounded-lg"
+          className="turnjs-flipbook-container shadow-2xl rounded-lg mx-auto"
           style={{
-            width: `${displayWidth * 2}px`,
+            width: `${containerWidth}px`,
             height: `${displayHeight}px`,
           }}
         >
