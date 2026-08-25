@@ -99,25 +99,25 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
           let targetPageH: number;
 
           if (isMobile) {
-            // Full mobile screen fill: 100% width, height proportionally fitted to screen
-            const screenW = window.innerWidth || 390;
+            // Mobile: 1 single full-screen page filling the smartphone screen
+            const screenW = window.innerWidth;
             const availH = window.innerHeight - 56;
             const fitW = screenW / rawW;
             const fitH = availH / rawH;
-            const fit = Math.max(fitW, Math.min(fitW, fitH));
+            const fit = Math.min(fitW, fitH);
             targetPageW = Math.round(rawW * fit);
             targetPageH = Math.round(rawH * fit);
           } else if (isLandscapePdf) {
             // Desktop landscape slide: fill max available stage
-            const fitW = (stageW - 16) / rawW;
-            const fitH = (stageH - 16) / rawH;
+            const fitW = (stageW - 32) / rawW;
+            const fitH = (stageH - 32) / rawH;
             const fit = Math.min(fitW, fitH, 2.0);
             targetPageW = Math.round(rawW * fit);
             targetPageH = Math.round(rawH * fit);
           } else {
-            // Dual spread fitting on desktop: maximize height & width to fill monitor!
-            const fitW = (stageW - 24) / (rawW * 2);
-            const fitH = (stageH - 16) / rawH;
+            // Desktop portrait 2-page spread: calculate exact page dimensions matching PDF aspect
+            const fitW = (stageW - 32) / (rawW * 2);
+            const fitH = (stageH - 32) / rawH;
             const fit = Math.min(fitW, fitH, 2.0);
             targetPageW = Math.round(rawW * fit);
             targetPageH = Math.round(rawH * fit);
@@ -220,13 +220,13 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
         minHeight: 100,
         maxHeight: 3000,
         drawShadow: true,
-        maxShadowOpacity: 0.5,
-        flippingTime: 650,
+        maxShadowOpacity: 0.4,
+        flippingTime: 600,
         usePortrait: isMobile || isLandscape,
         startPage: Math.max(0, currentPage - 1),
         startZIndex: 5,
         autoSize: true,
-        showCover: false, // Never add extra hardcover white border margins!
+        showCover: !isMobile && !isLandscape, // Single page on mobile, dual cover spread on desktop
         mobileScrollSupport: false,
         useMouseEvents: true,
         swipeDistance: 30,
