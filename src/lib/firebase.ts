@@ -19,6 +19,7 @@ import {
   type Firestore,
 } from 'firebase/firestore';
 import type { Book } from '../types/book';
+import { isAuthorizedAdminEmail, STORAGE_KEYS } from './config';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyBmxXVI9IYW0UGqZKCFNXoQ3WlM_WwsMQE',
@@ -52,14 +53,29 @@ if (isFirebaseConfigured && typeof window !== 'undefined') {
 export { auth, db };
 
 /**
- * Secure Firebase Authentication
- * Protects administrator credentials against brute force attacks, credential stuffing, and session hijacking.
+ * Secure Firebase Authentication with Admin Whitelist
+ * Only allowed admin emails (anirudhkaushik@galgotiasuniversity.edu.in, anirudhsharma9893@gmail.com) can log in.
  */
 export async function loginWithFirebase(email: string, pass: string): Promise<User> {
   if (!auth) {
     throw new Error('Firebase is not configured.');
   }
-  const credential = await signInWithEmailAndPassword(auth, email, pass);
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  // Strict email whitelist check
+  if (!isAuthorizedAdminEmail(cleanEmail)) {
+    throw new Error(`Unauthorized: "${cleanEmail}" is not an authorized administrator email.`);
+  }
+
+  const credential = await signInWithEmailAndPassword(auth, cleanEmail, pass);
+
+  if (!isAuthorizedAdminEmail(credential.user.email)) {
+    await firebaseSignOut(auth);
+    throw new Error(`Access Denied: "${credential.user.email}" is not authorized.`);
+  }
+
+  localStorage.setItem(STORAGE_KEYS.ADMIN_USER_EMAIL, credential.user.email || cleanEmail);
   return credential.user;
 }
 
@@ -68,6 +84,7 @@ export async function logoutFromFirebase(): Promise<void> {
     await firebaseSignOut(auth);
   }
   localStorage.removeItem('flipbook_admin_authenticated');
+  localStorage.removeItem(STORAGE_KEYS.ADMIN_USER_EMAIL);
 }
 
 export function subscribeToAuthChanges(callback: (user: User | null) => void) {

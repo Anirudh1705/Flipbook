@@ -2,15 +2,22 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Publications Collection Security Rules:
-    // - Public can READ published publications
-    // - Only Authenticated Administrators can WRITE, UPDATE, or DELETE
-    match /publications/{bookId} {
-      allow read: if resource.data.is_published == true || request.auth != null;
-      allow create, update, delete: if request.auth != null;
+    // Helper function checking if request is from an authorized admin email
+    function isAuthorizedAdmin() {
+      return request.auth != null && 
+        (request.auth.token.email.lower() == 'anirudhkaushik@galgotiasuniversity.edu.in' ||
+         request.auth.token.email.lower() == 'anirudhsharma9893@gmail.com');
     }
 
-    // Default deny for all other collections
+    // Publications Collection:
+    // - Anyone can read published books
+    // - Only authorized admins can create, update, or delete
+    match /publications/{bookId} {
+      allow read: if resource.data.is_published == true || isAuthorizedAdmin();
+      allow create, update, delete: if isAuthorizedAdmin();
+    }
+
+    // Default deny for everything else
     match /{document=**} {
       allow read, write: if false;
     }
