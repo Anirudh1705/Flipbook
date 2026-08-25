@@ -1,10 +1,6 @@
 {
   "rewrites": [
     {
-      "source": "/api/pdf-proxy",
-      "destination": "/api/pdf-proxy"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
