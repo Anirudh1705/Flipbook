@@ -59,10 +59,18 @@ export const BookCard: React.FC<BookCardProps> = ({ book }) => {
                 {new Date(book.publication_date).getFullYear()}
               </span>
             )}
-            <span>•</span>
-            <span>{book.page_count || 14} pages</span>
-            <span>•</span>
-            <span>{formatBytes(book.file_size || 1048576)}</span>
+            {book.page_count ? (
+              <>
+                <span>•</span>
+                <span>{book.page_count} pages</span>
+              </>
+            ) : null}
+            {book.file_size ? (
+              <>
+                <span>•</span>
+                <span>{formatBytes(book.file_size)}</span>
+              </>
+            ) : null}
           </div>
 
           <h3 className="font-bold text-slate-100 text-base leading-snug group-hover:text-brand-300 transition-colors line-clamp-2">

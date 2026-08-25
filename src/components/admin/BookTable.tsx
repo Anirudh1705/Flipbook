@@ -104,8 +104,10 @@ export const BookTable: React.FC<BookTableProps> = ({
 
                   {/* Size & Pages */}
                   <td className="py-3.5 px-4 hidden lg:table-cell font-mono text-[11px] text-slate-400">
-                    <div>{book.page_count || 14} pages</div>
-                    <div className="text-slate-500">{formatBytes(book.file_size || 1048576)}</div>
+                    <div>{book.page_count ? `${book.page_count} pages` : '—'}</div>
+                    <div className="text-slate-500">
+                      {book.file_size ? formatBytes(book.file_size) : 'Digital Edition'}
+                    </div>
                   </td>
 
                   {/* Published Status Toggle */}

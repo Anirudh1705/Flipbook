@@ -34,20 +34,20 @@ export const BookFormModal: React.FC<BookFormModalProps> = ({
       setPdfSourceType(initialBook.pdf_url.startsWith('idb://') ? 'upload' : 'url');
       setSelectedFile(null);
       setSelectedFileName(null);
-      setSelectedFileSize(initialBook.file_size || 50 * 1024 * 1024);
+      setSelectedFileSize(initialBook.file_size || 0);
     } else {
       setTitle('');
       setPdfUrl('');
       setPdfSourceType('upload');
       setSelectedFile(null);
       setSelectedFileName(null);
-      setSelectedFileSize(50 * 1024 * 1024);
+      setSelectedFileSize(0);
     }
     setError(null);
   }, [initialBook, isOpen]);
 
   // Handle local PDF file selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -100,15 +100,14 @@ export const BookFormModal: React.FC<BookFormModalProps> = ({
           .replace(/(^-|-$)+/g, '');
 
       let finalPdfUrl = '';
+      let detectedPages = initialBook?.page_count || 0;
 
       if (pdfSourceType === 'upload' && selectedFile) {
-        // Save file locally to browser IndexedDB (persists across page reloads & tabs with 0 accounts needed)
         const fileKey = `pdf_${Date.now()}_${cleanSlug}`;
         finalPdfUrl = await savePdfToStorage(fileKey, selectedFile);
       } else if (pdfSourceType === 'upload' && initialBook?.pdf_url) {
         finalPdfUrl = initialBook.pdf_url;
       } else {
-        // Resolve online link
         finalPdfUrl = await resolveDirectPdfUrl(pdfUrl.trim());
       }
 
@@ -127,8 +126,8 @@ export const BookFormModal: React.FC<BookFormModalProps> = ({
         category: initialBook?.category || 'General Publications',
         author: initialBook?.author || 'Editorial Team',
         publication_date: initialBook?.publication_date || new Date().toISOString().split('T')[0],
-        page_count: initialBook?.page_count || 14,
-        file_size: selectedFileSize,
+        page_count: detectedPages || (initialBook?.page_count ?? 8),
+        file_size: selectedFileSize || (initialBook?.file_size ?? 0),
         is_published: true,
       });
 

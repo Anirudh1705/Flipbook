@@ -129,8 +129,8 @@ export function useBooks() {
         book_number: current.length + 1,
         display_order: current.length + 1,
         is_published: bookData.is_published ?? true,
-        page_count: bookData.page_count ?? 14,
-        file_size: bookData.file_size ?? 1048576,
+        page_count: bookData.page_count ?? 0,
+        file_size: bookData.file_size ?? 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       } as Book;

@@ -155,8 +155,8 @@ export async function saveBookToFirestore(book: Partial<Book>): Promise<Book> {
     category: book.category || 'General',
     author: book.author || '',
     publication_date: book.publication_date || new Date().toISOString().split('T')[0],
-    page_count: book.page_count || 14,
-    file_size: book.file_size || 1048576,
+    page_count: book.page_count || 0,
+    file_size: book.file_size || 0,
     is_published: book.is_published ?? true,
     display_order: book.display_order || 1,
   };
