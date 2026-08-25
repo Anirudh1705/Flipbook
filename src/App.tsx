@@ -1,0 +1,28 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HomePage } from './pages/HomePage';
+import { BookViewerPage } from './pages/BookViewerPage';
+import { AdminDashboardPage } from './pages/AdminDashboardPage';
+import { AdminLoginPage } from './pages/AdminLoginPage';
+
+export function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Public Homepage with 25-book library grid */}
+        <Route path="/" element={<HomePage />} />
+
+        {/* Dedicated high-performance flipbook reader */}
+        <Route path="/book/:slug" element={<BookViewerPage />} />
+
+        {/* Administration */}
+        <Route path="/admin" element={<AdminDashboardPage />} />
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+
+        {/* Fallback to Home */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
