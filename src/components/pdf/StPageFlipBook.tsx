@@ -87,38 +87,28 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
             onPageLoaded({ width: rawW, height: rawH });
           }
 
-          // Calculate display size for book based on container size (maximize screen usage)
-          const stageEl = stageContainerRef.current;
-          const stageW = stageEl ? stageEl.clientWidth - 16 : window.innerWidth - 16;
-          const stageH = stageEl ? stageEl.clientHeight - 16 : window.innerHeight - 80;
-
-          const isLandscapePdf = rawW >= rawH;
           const isMobile = window.innerWidth < 768;
+          const isLandscapePdf = rawW >= rawH;
 
           let targetPageW: number;
           let targetPageH: number;
 
           if (isMobile) {
-            // Mobile: 1 single centered page fitting comfortably inside screen
-            const screenW = window.innerWidth - 16;
-            const availH = window.innerHeight - 80;
-            const fitW = screenW / rawW;
-            const fitH = availH / rawH;
-            const fit = Math.min(fitW, fitH);
-            targetPageW = Math.round(rawW * fit);
-            targetPageH = Math.round(rawH * fit);
+            // Full mobile width fill (100% of mobile screen width)
+            targetPageW = window.innerWidth;
+            targetPageH = Math.round((rawH / rawW) * targetPageW);
           } else if (isLandscapePdf) {
-            // Desktop landscape slide: fit within stage
-            const fitW = (stageW - 48) / rawW;
-            const fitH = (stageH - 48) / rawH;
-            const fit = Math.min(fitW, fitH, 1.8);
+            // Desktop landscape slide: fill entire available stage
+            const availW = window.innerWidth - 20;
+            const availH = window.innerHeight - 60;
+            const fit = Math.min(availW / rawW, availH / rawH);
             targetPageW = Math.round(rawW * fit);
             targetPageH = Math.round(rawH * fit);
           } else {
-            // Desktop portrait 2-page spread: compact fitting matching exact PDF aspect ratio
-            const fitW = (stageW - 48) / (rawW * 2);
-            const fitH = (stageH - 48) / rawH;
-            const fit = Math.min(fitW, fitH, 1.8);
+            // Desktop 2-page spread: maximize to fill monitor height & width
+            const availW = window.innerWidth - 20;
+            const availH = window.innerHeight - 60;
+            const fit = Math.min(availW / (rawW * 2), availH / rawH);
             targetPageW = Math.round(rawW * fit);
             targetPageH = Math.round(rawH * fit);
           }
