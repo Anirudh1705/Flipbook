@@ -116,9 +116,14 @@ export const PdfPageCanvas: React.FC<PdfPageCanvasProps> = ({
 
   return (
     <div
-      className={`relative inline-block select-none overflow-hidden bg-white ${getSideShadowClass()} ${className}`}
+      className={`relative inline-block overflow-hidden bg-white touch-pan-y ${getSideShadowClass()} ${className}`}
+      style={{ touchAction: 'pan-y' }}
     >
-      <canvas ref={canvasRef} className="block transition-opacity duration-200" />
+      <canvas
+        ref={canvasRef}
+        className="block transition-opacity duration-200 pointer-events-none"
+        style={{ touchAction: 'pan-y' }}
+      />
 
       {error && (
         <div className="absolute inset-0 bg-red-950/80 flex items-center justify-center p-4 text-center">

@@ -96,9 +96,30 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
   const scrollToPage = (page: number) => {
     const el = document.getElementById(`page-container-${page}`);
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
+
+  // Live scroll position listener to update current page indicator
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const scrollTop = container.scrollTop;
+    const midPoint = scrollTop + container.clientHeight / 2;
+
+    for (let p = 1; p <= totalPages; p++) {
+      const el = document.getElementById(`page-container-${p}`);
+      if (el) {
+        const top = el.offsetTop;
+        const bottom = top + el.offsetHeight;
+        if (midPoint >= top && midPoint <= bottom) {
+          setCurrentPage(p);
+          break;
+        }
+      }
+    }
+  }, [totalPages]);
 
   // Page Navigation Handlers
   const handleGoToPage = (page: number) => {
@@ -244,6 +265,7 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
       {/* Main Continuous Document Stage with Native Touch Scrolling */}
       <main
         ref={scrollContainerRef}
+        onScroll={handleScroll}
         style={{
           WebkitOverflowScrolling: 'touch',
           touchAction: 'pan-y',
