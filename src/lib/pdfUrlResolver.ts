@@ -1,7 +1,6 @@
 /**
  * Intelligent PDF URL Resolver
  * Automatically resolves webpage / repository / cloud links into direct streaming PDF URLs.
- * Internet Archive files are resolved to their direct, CORS-enabled storage cluster nodes.
  */
 export function cleanArchiveFilename(name: string): string {
   let decoded = name;
@@ -26,7 +25,7 @@ export function cleanArchiveFilename(name: string): string {
 export async function resolveDirectPdfUrl(rawUrl: string): Promise<string> {
   let url = rawUrl.trim();
 
-  // Strip existing proxy wrappers to avoid duplicate proxying or broken proxy paths
+  // Strip existing proxy wrappers to avoid duplicate proxying
   while (url.includes('api/pdf-proxy?url=')) {
     const parts = url.split(/api\/pdf-proxy\?url=/);
     url = decodeURIComponent(parts[parts.length - 1]);
@@ -63,21 +62,22 @@ export async function resolveDirectPdfUrl(rawUrl: string): Promise<string> {
 
         if (filename) {
           const encodedFilename = cleanArchiveFilename(filename);
-          return `https://${server}${dir}/${encodedFilename}`;
+          const directClusterUrl = `https://${server}${dir}/${encodedFilename}`;
+          return `/api/pdf-proxy?url=${encodeURIComponent(directClusterUrl)}`;
         }
       }
     } catch {
-      // Fallback to cleaned direct URL
+      // Fallback
     }
 
-    if (targetFile) {
-      return cleanArchiveFilename(url);
-    }
+    const cleanDirect = cleanArchiveFilename(url);
+    return `/api/pdf-proxy?url=${encodeURIComponent(cleanDirect)}`;
   }
 
   // 2. Direct Archive.org storage node link
   if (url.includes('.archive.org/')) {
-    return cleanArchiveFilename(url);
+    const cleanDirect = cleanArchiveFilename(url);
+    return `/api/pdf-proxy?url=${encodeURIComponent(cleanDirect)}`;
   }
 
   // 3. GitHub Blob URL: https://github.com/user/repo/blob/main/doc.pdf -> raw.githubusercontent.com
