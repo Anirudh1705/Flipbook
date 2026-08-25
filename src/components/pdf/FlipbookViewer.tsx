@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { Book } from '../../types/book';
-import { RealisticPageFlip, type RealisticPageFlipHandle } from './RealisticPageFlip';
+import { StPageFlipBook, type StPageFlipHandle } from './StPageFlipBook';
 import { PdfScrollPage } from './PdfScrollPage';
 import { PdfToolbar } from './PdfToolbar';
 import { PdfThumbnails } from './PdfThumbnails';
@@ -16,7 +16,7 @@ interface FlipbookViewerProps {
 export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocument }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const pageFlipRef = useRef<RealisticPageFlipHandle | null>(null);
+  const pageFlipRef = useRef<StPageFlipHandle | null>(null);
   const totalPages = pdfDocument.numPages;
 
   const [viewMode, setViewMode] = useState<'flipbook' | 'scroll'>('flipbook');
@@ -268,7 +268,7 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
       {/* Stage: 3D Flipbook or Continuous Vertical Scroll */}
       {viewMode === 'flipbook' ? (
         <main className="flex-1 min-h-0 w-full h-full relative flex items-center justify-center pt-14 pb-16 sm:pb-20 overflow-hidden">
-          <RealisticPageFlip
+          <StPageFlipBook
             ref={pageFlipRef}
             pdfDocument={pdfDocument}
             currentPage={currentPage}
