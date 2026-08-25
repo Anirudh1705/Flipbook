@@ -99,26 +99,26 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
           let targetPageH: number;
 
           if (isMobile) {
-            // Mobile: 1 single full-screen page filling the smartphone screen
-            const screenW = window.innerWidth;
-            const availH = window.innerHeight - 56;
+            // Mobile: 1 single centered page fitting comfortably inside screen
+            const screenW = window.innerWidth - 16;
+            const availH = window.innerHeight - 80;
             const fitW = screenW / rawW;
             const fitH = availH / rawH;
             const fit = Math.min(fitW, fitH);
             targetPageW = Math.round(rawW * fit);
             targetPageH = Math.round(rawH * fit);
           } else if (isLandscapePdf) {
-            // Desktop landscape slide: fill max available stage
-            const fitW = (stageW - 32) / rawW;
-            const fitH = (stageH - 32) / rawH;
-            const fit = Math.min(fitW, fitH, 2.0);
+            // Desktop landscape slide: fit within stage
+            const fitW = (stageW - 48) / rawW;
+            const fitH = (stageH - 48) / rawH;
+            const fit = Math.min(fitW, fitH, 1.8);
             targetPageW = Math.round(rawW * fit);
             targetPageH = Math.round(rawH * fit);
           } else {
-            // Desktop portrait 2-page spread: calculate exact page dimensions matching PDF aspect
-            const fitW = (stageW - 32) / (rawW * 2);
-            const fitH = (stageH - 32) / rawH;
-            const fit = Math.min(fitW, fitH, 2.0);
+            // Desktop portrait 2-page spread: compact fitting matching exact PDF aspect ratio
+            const fitW = (stageW - 48) / (rawW * 2);
+            const fitH = (stageH - 48) / rawH;
+            const fit = Math.min(fitW, fitH, 1.8);
             targetPageW = Math.round(rawW * fit);
             targetPageH = Math.round(rawH * fit);
           }
@@ -226,7 +226,7 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
         startPage: Math.max(0, currentPage - 1),
         startZIndex: 5,
         autoSize: true,
-        showCover: !isMobile && !isLandscape, // Single page on mobile, dual cover spread on desktop
+        showCover: false, // Clean borderless fit without artificial white cover margins
         mobileScrollSupport: false,
         useMouseEvents: true,
         swipeDistance: 30,
