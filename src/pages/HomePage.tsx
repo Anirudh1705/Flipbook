@@ -46,7 +46,6 @@ export const HomePage: React.FC = () => {
                 Secure Reader
               </span>
             </div>
-            <div className="text-[11px] text-slate-500 font-mono">Direct Publication Gateway</div>
           </div>
         </div>
 
