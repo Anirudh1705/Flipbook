@@ -93,20 +93,20 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
           }
 
           const dpr = Math.min(window.devicePixelRatio || 1, 2);
-          const renderScale = Math.max(1.5, ((displayWidth * 1.5) / unscaledVp.width) * dpr);
+          const renderScale = Math.max(1.2, ((displayWidth * 1.25) / unscaledVp.width) * dpr);
 
-          const imagePromises: Promise<string>[] = [];
+          const images: string[] = [];
 
           for (let p = 1; p <= totalPages; p++) {
-            imagePromises.push(
-              (async () => {
-                const page = await pdfDocument.getPage(p);
-                const viewport = page.getViewport({ scale: renderScale });
-                const canvas = document.createElement('canvas');
-                canvas.width = Math.floor(viewport.width);
-                canvas.height = Math.floor(viewport.height);
-                const ctx = canvas.getContext('2d', { alpha: false });
-                if (!ctx) return '';
+            if (isCancelled) return;
+            try {
+              const page = await pdfDocument.getPage(p);
+              const viewport = page.getViewport({ scale: renderScale });
+              const canvas = document.createElement('canvas');
+              canvas.width = Math.floor(viewport.width);
+              canvas.height = Math.floor(viewport.height);
+              const ctx = canvas.getContext('2d', { alpha: false });
+              if (ctx) {
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -116,13 +116,14 @@ export const TurnFlipbook = forwardRef<TurnFlipbookHandle, TurnFlipbookProps>(
                   canvas: canvas,
                 }).promise;
 
-                return canvas.toDataURL('image/jpeg', 0.92);
-              })()
-            );
+                images.push(canvas.toDataURL('image/jpeg', 0.88));
+              }
+            } catch (pageErr) {
+              console.warn(`Error rendering page ${p}:`, pageErr);
+            }
           }
 
-          const images = await Promise.all(imagePromises);
-          if (!isCancelled) {
+          if (!isCancelled && images.length > 0) {
             setRenderedImageUrls(images);
             setIsLoadingImages(false);
           }
