@@ -341,7 +341,7 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
           ref={scrollContainerRef}
           className="flex-1 w-full overflow-y-auto overflow-x-auto pt-16 pb-24 px-4 scrollbar-thin"
         >
-          <div className="min-w-fit w-full flex flex-col items-center mx-auto">
+          <div className="min-w-fit w-full flex flex-col items-center mx-auto my-4 max-w-fit shadow-2xl rounded-xl overflow-hidden border border-slate-800/80 bg-white">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
               <PdfScrollPage
                 key={pageNum}
