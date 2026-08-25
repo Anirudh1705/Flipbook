@@ -168,8 +168,8 @@ export const PdfToolbar: React.FC<PdfToolbarProps> = ({
         </div>
       </div>
 
-      {/* Bottom Floating Control Bar (Desktop / Tablet only) */}
-      <div className="hidden sm:block absolute bottom-4 left-1/2 -translate-x-1/2 z-30 max-w-2xl w-[94%] sm:w-auto">
+      {/* Bottom Floating Control Bar */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 max-w-2xl w-[94%] sm:w-auto">
         <div className="glass-toolbar rounded-2xl p-1.5 sm:p-2 border border-slate-800 shadow-2xl flex items-center justify-between sm:justify-center gap-1 sm:gap-3 text-xs text-slate-300">
           {/* First & Previous Page */}
           <div className="flex items-center gap-1">

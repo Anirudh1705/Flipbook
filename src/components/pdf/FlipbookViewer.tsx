@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { Book } from '../../types/book';
-import { PdfScrollPage } from './PdfScrollPage';
+import { TurnFlipbook, type TurnFlipbookHandle } from './TurnFlipbook';
 import { PdfToolbar } from './PdfToolbar';
 import { PdfThumbnails } from './PdfThumbnails';
 import { PdfSearchModal } from './PdfSearchModal';
@@ -14,19 +14,11 @@ interface FlipbookViewerProps {
 
 export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocument }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const turnFlipbookRef = useRef<TurnFlipbookHandle | null>(null);
   const totalPages = pdfDocument.numPages;
 
-  // Viewport & Layout state - Continuous high-performance document reader
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
-  const [scale, setScale] = useState<number>(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      const availWidth = window.innerWidth - 24;
-      return Math.max(0.35, Math.min(0.95, Number((availWidth / 595).toFixed(2))));
-    }
-    return 1.0;
-  });
+  const [scale, setScale] = useState<number>(1.0);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showThumbnails, setShowThumbnails] = useState<boolean>(false);
   const [showSearch, setShowSearch] = useState<boolean>(false);
@@ -35,116 +27,31 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
     height: 842,
   });
 
-  // Custom hooks for search
   const search = usePdfSearch(pdfDocument);
-
-  // Responsive mobile detection
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // Precision Fit Scale Calculations (Fit Page & Fit Width)
-  const calculateFitScale = useCallback(
-    (mode: 'page' | 'width') => {
-      const container = containerRef.current;
-      if (!container || baseDimensions.width === 0 || baseDimensions.height === 0) return;
-
-      const availWidth = Math.max(280, container.clientWidth - (isMobile ? 12 : 48));
-      const availHeight = Math.max(300, container.clientHeight - (isMobile ? 100 : 130));
-
-      if (isMobile) {
-        // On mobile, automatically fit to available screen width for instant readability
-        const optimal = availWidth / baseDimensions.width;
-        setScale(Math.max(0.3, Math.min(1.2, Number(optimal.toFixed(2)))));
-      } else {
-        if (mode === 'page') {
-          const fitH = (availHeight - 20) / baseDimensions.height;
-          const fitW = (availWidth - 20) / baseDimensions.width;
-          const optimal = Math.min(fitH, fitW, 1.4);
-          setScale(Math.max(0.4, Number(optimal.toFixed(2))));
-        } else {
-          const targetColWidth = Math.min(availWidth - 24, 920);
-          const optimal = targetColWidth / baseDimensions.width;
-          setScale(Math.max(0.4, Math.min(1.55, Number(optimal.toFixed(2)))));
-        }
-      }
-    },
-    [isMobile, baseDimensions]
-  );
-
-  // Initial fit on load
-  const hasInitializedScale = useRef(false);
-  useEffect(() => {
-    if (!hasInitializedScale.current && baseDimensions.width > 0) {
-      hasInitializedScale.current = true;
-      calculateFitScale('page');
-    }
-  }, [baseDimensions, calculateFitScale]);
-
-  // Smooth scroll helper for continuous document reader
-  const scrollToPage = useCallback((page: number) => {
-    const container = scrollContainerRef.current;
-    const el = document.getElementById(`page-container-${page}`);
-    if (container && el) {
-      const containerRect = container.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-      const relativeTop = elRect.top - containerRect.top + container.scrollTop;
-      container.scrollTo({ top: Math.max(0, relativeTop - 70), behavior: 'smooth' });
-    }
-  }, []);
-
-  // Live scroll position listener to update current page indicator
-  const handleScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const containerRect = container.getBoundingClientRect();
-    const containerMidY = containerRect.top + containerRect.height / 2;
-
-    for (let p = 1; p <= totalPages; p++) {
-      const el = document.getElementById(`page-container-${p}`);
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        if (rect.top <= containerMidY && rect.bottom >= containerMidY) {
-          setCurrentPage(p);
-          break;
-        }
-      }
-    }
-  }, [totalPages]);
 
   // Page Navigation Handlers
   const handleGoToPage = (page: number) => {
     const clamped = Math.max(1, Math.min(page, totalPages));
     setCurrentPage(clamped);
-    scrollToPage(clamped);
+    turnFlipbookRef.current?.flipToPage(clamped);
   };
 
   const handleNextPage = useCallback(() => {
-    const next = Math.min(currentPage + 1, totalPages);
-    setCurrentPage(next);
-    scrollToPage(next);
-  }, [currentPage, totalPages, scrollToPage]);
+    turnFlipbookRef.current?.flipNext();
+  }, []);
 
   const handlePrevPage = useCallback(() => {
-    const prev = Math.max(currentPage - 1, 1);
-    setCurrentPage(prev);
-    scrollToPage(prev);
-  }, [currentPage, scrollToPage]);
+    turnFlipbookRef.current?.flipPrev();
+  }, []);
 
   const handleFirstPage = () => handleGoToPage(1);
   const handleLastPage = () => handleGoToPage(totalPages);
 
   // Zoom Handlers
-  const handleZoomIn = () => setScale(s => Math.min(Number((s + 0.15).toFixed(2)), 2.5));
-  const handleZoomOut = () => setScale(s => Math.max(Number((s - 0.15).toFixed(2)), 0.4));
-  const handleFitPage = () => calculateFitScale('page');
-  const handleFitWidth = () => calculateFitScale('width');
+  const handleZoomIn = () => setScale(s => Math.min(Number((s + 0.15).toFixed(2)), 2.0));
+  const handleZoomOut = () => setScale(s => Math.max(Number((s - 0.15).toFixed(2)), 0.6));
+  const handleFitPage = () => setScale(1.0);
+  const handleFitWidth = () => setScale(1.2);
 
   // Fullscreen Handler
   const handleToggleFullscreen = () => {
@@ -157,28 +64,12 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
     }
   };
 
-  // Sync fullscreen change event
   useEffect(() => {
     const handleFsChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement));
     };
     document.addEventListener('fullscreenchange', handleFsChange);
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
-  }, []);
-
-  // Global mouse wheel listener to guarantee scrolling from any screen position
-  useEffect(() => {
-    const handleWheel = (e: WheelEvent) => {
-      const container = scrollContainerRef.current;
-      if (!container) return;
-      if (['INPUT', 'TEXTAREA'].includes((document.activeElement as HTMLElement)?.tagName)) return;
-      if (!container.contains(e.target as Node)) {
-        container.scrollTop += e.deltaY;
-      }
-    };
-
-    window.addEventListener('wheel', handleWheel, { passive: true });
-    return () => window.removeEventListener('wheel', handleWheel);
   }, []);
 
   // Keyboard navigation shortcuts
@@ -188,18 +79,12 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
         return;
       }
 
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
         e.preventDefault();
         handleNextPage();
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
         e.preventDefault();
         handlePrevPage();
-      } else if (e.key === '+' || e.key === '=') {
-        e.preventDefault();
-        handleZoomIn();
-      } else if (e.key === '-' || e.key === '_') {
-        e.preventDefault();
-        handleZoomOut();
       } else if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
         handleToggleFullscreen();
@@ -249,7 +134,7 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
         onClose={() => setShowThumbnails(false)}
         onSelectPage={page => {
           handleGoToPage(page);
-          if (isMobile) setShowThumbnails(false);
+          setShowThumbnails(false);
         }}
       />
 
@@ -270,29 +155,18 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
         onGoToPage={handleGoToPage}
       />
 
-      {/* Main Continuous Document Stage with Native Touch Scrolling */}
-      <main
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
-        style={{
-          WebkitOverflowScrolling: 'touch',
-          touchAction: 'pan-y',
-        }}
-        className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden pt-16 pb-6 sm:pb-24 px-1 sm:px-4 flex justify-center"
-      >
-        <div className="w-full flex flex-col items-center mx-auto my-2 sm:my-4 max-w-full sm:max-w-fit shadow-2xl rounded-lg sm:rounded-xl overflow-hidden border border-slate-800/80 bg-white">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
-            <PdfScrollPage
-              key={pageNum}
-              pdfDocument={pdfDocument}
-              pageNumber={pageNum}
-              scale={scale}
-              baseDimensions={baseDimensions}
-              onVisible={p => setCurrentPage(p)}
-              onDimensionsLoaded={dims => setBaseDimensions(dims)}
-            />
-          ))}
-        </div>
+      {/* Main 3D Realistic Page-Flipping Stage */}
+      <main className="flex-1 min-h-0 w-full h-full relative flex items-center justify-center pt-14 pb-16 sm:pb-20 overflow-hidden">
+        <TurnFlipbook
+          ref={turnFlipbookRef}
+          pdfDocument={pdfDocument}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          scale={scale}
+          baseDimensions={baseDimensions}
+          onPageChange={newPage => setCurrentPage(newPage)}
+          onDimensionsLoaded={dims => setBaseDimensions(dims)}
+        />
       </main>
     </div>
   );
