@@ -10,11 +10,11 @@ service cloud.firestore {
     }
 
     // Publications Collection:
-    // - Anyone can read published books
-    // - Only authorized admins can create, update, or delete
+    // - Public read access so anyone can view publications on any device
+    // - Write/edit/delete strictly locked to authorized admins only
     match /publications/{bookId} {
-      allow read: if resource.data.is_published == true || isAuthorizedAdmin();
-      allow create, update, delete: if isAuthorizedAdmin();
+      allow read: if true;
+      allow write: if isAuthorizedAdmin();
     }
 
     // Default deny for everything else

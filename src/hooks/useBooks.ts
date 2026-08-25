@@ -62,9 +62,21 @@ export function useBooks() {
   }, [fetchBooks]);
 
   const saveBook = async (bookData: Partial<Book> & { id?: string }): Promise<Book> => {
+    const nextNumber =
+      bookData.book_number ||
+      (books.length > 0
+        ? Math.max(...books.map(b => Number(b.book_number) || 0)) + 1
+        : 1);
+
+    const payload: Partial<Book> = {
+      ...bookData,
+      book_number: nextNumber,
+      display_order: bookData.display_order || nextNumber,
+    };
+
     // 1. Firebase Firestore
     if (isFirebaseConfigured) {
-      const saved = await saveBookToFirestore(bookData);
+      const saved = await saveBookToFirestore(payload);
       // Sync local storage
       const current = getLocalBooks();
       const exists = current.some(b => b.id === saved.id);
