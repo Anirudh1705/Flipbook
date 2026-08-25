@@ -46,8 +46,8 @@ export const PdfScrollPage: React.FC<PdfScrollPageProps> = ({
         });
       },
       {
-        rootMargin: '400px 0px 400px 0px',
-        threshold: [0, 0.4, 0.8],
+        rootMargin: '1000px 0px 1000px 0px',
+        threshold: [0, 0.2, 0.5],
       }
     );
 

@@ -271,7 +271,7 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
           touchAction: 'pan-y',
           overscrollBehaviorY: 'contain',
         }}
-        className="flex-1 w-full overflow-y-auto overflow-x-hidden pt-16 pb-24 px-1 sm:px-4 scrollbar-thin flex justify-center touch-pan-y"
+        className="flex-1 min-h-0 w-full overflow-y-scroll overflow-x-hidden pt-16 pb-24 px-1 sm:px-4 scrollbar-thin flex justify-center touch-pan-y"
       >
         <div className="w-full flex flex-col items-center mx-auto my-2 sm:my-4 max-w-full sm:max-w-fit shadow-2xl rounded-lg sm:rounded-xl overflow-hidden border border-slate-800/80 bg-white">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
