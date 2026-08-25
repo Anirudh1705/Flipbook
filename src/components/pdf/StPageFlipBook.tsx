@@ -27,6 +27,7 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
       pdfDocument,
       currentPage,
       totalPages,
+      scale,
       onPageChange,
       onPageLoaded,
     },
@@ -116,8 +117,9 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
           setBookSize({ width: Math.max(260, targetPageW), height: Math.max(360, targetPageH) });
 
           const renderedUrls: string[] = [];
-          // Target render DPI scale (1.5x - 2.0x for crisp sharp text)
-          const renderScale = Math.min(2.0, Math.max(1.3, (window.devicePixelRatio || 1) * 1.2));
+          // Ultra-high DPI scale for crystal clear, razor-sharp text and graphics
+          const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+          const renderScale = Math.max(2.5, dpr * 2.0);
 
           for (let i = 1; i <= totalPages; i++) {
             if (isCancelled) return;
@@ -126,11 +128,14 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
             const viewport = page.getViewport({ scale: renderScale });
 
             const canvas = document.createElement('canvas');
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
+            canvas.width = Math.floor(viewport.width);
+            canvas.height = Math.floor(viewport.height);
             const ctx = canvas.getContext('2d', { alpha: false });
 
             if (ctx) {
+              // Enable high quality image smoothing
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = 'high';
               ctx.fillStyle = '#ffffff';
               ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -142,7 +147,16 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
               } as any);
 
               await renderTask.promise;
-              const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+              // Use high quality WebP/PNG for ultra-sharp typography without JPEG artifacts
+              let dataUrl: string;
+              try {
+                dataUrl = canvas.toDataURL('image/webp', 0.98);
+                if (!dataUrl.startsWith('data:image/webp')) {
+                  dataUrl = canvas.toDataURL('image/png');
+                }
+              } catch {
+                dataUrl = canvas.toDataURL('image/png');
+              }
               renderedUrls.push(dataUrl);
             }
 
@@ -191,14 +205,14 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
       const pageFlip = new PageFlip(bookContainerRef.current, {
         width: bookSize.width,
         height: bookSize.height,
-        size: 'fixed',
+        size: 'stretch',
         minWidth: 200,
-        maxWidth: 1600,
+        maxWidth: 2400,
         minHeight: 300,
-        maxHeight: 1200,
+        maxHeight: 2000,
         drawShadow: true,
-        maxShadowOpacity: 0.6,
-        flippingTime: 750,
+        maxShadowOpacity: 0.5,
+        flippingTime: 700,
         usePortrait: isMobile || isLandscape,
         startPage: Math.max(0, currentPage - 1),
         startZIndex: 5,
@@ -243,8 +257,8 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
             <div className="flex flex-col items-center gap-4 p-8 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-2xl">
               <Loader2 className="w-10 h-10 text-brand-400 animate-spin" />
               <div className="text-center">
-                <p className="text-sm font-semibold text-slate-200">Preparing 3D Flipbook...</p>
-                <p className="text-xs text-slate-400 mt-1">Rendering high-resolution pages ({progress}%)</p>
+                <p className="text-sm font-semibold text-slate-200">Preparing 4K HD Flipbook...</p>
+                <p className="text-xs text-slate-400 mt-1">Rendering high-resolution vector pages ({progress}%)</p>
               </div>
               <div className="w-48 h-1.5 bg-slate-800 rounded-full overflow-hidden">
                 <div
@@ -256,12 +270,14 @@ export const StPageFlipBook = forwardRef<StPageFlipHandle, StPageFlipBookProps>(
           </div>
         )}
 
-        {/* The PageFlip book mount element */}
+        {/* The PageFlip book mount element with zoom support */}
         <div
           ref={bookContainerRef}
-          className="relative mx-auto drop-shadow-2xl flex items-center justify-center"
+          className="relative mx-auto drop-shadow-2xl flex items-center justify-center transition-transform duration-200"
           style={{
             visibility: isLoading ? 'hidden' : 'visible',
+            transform: scale && scale !== 1 ? `scale(${scale})` : undefined,
+            transformOrigin: 'center center',
           }}
         />
       </div>
