@@ -16,8 +16,6 @@ import {
   doc,
   setDoc,
   deleteDoc,
-  query,
-  orderBy,
   type Firestore,
 } from 'firebase/firestore';
 import type { Book } from '../types/book';
@@ -129,9 +127,9 @@ const BOOKS_COLLECTION = 'publications';
 export async function getBooksFromFirestore(): Promise<Book[]> {
   if (!db) return [];
   try {
-    const q = query(collection(db, BOOKS_COLLECTION), orderBy('display_order', 'asc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Book));
+    const snapshot = await getDocs(collection(db, BOOKS_COLLECTION));
+    const items = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Book));
+    return items.sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
   } catch (err) {
     console.warn('Firestore fetch failed:', err);
     return [];
