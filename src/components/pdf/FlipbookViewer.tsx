@@ -19,7 +19,7 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
   const pageFlipRef = useRef<StPageFlipHandle | null>(null);
   const totalPages = pdfDocument.numPages;
 
-  const [viewMode, setViewMode] = useState<'flipbook' | 'scroll'>('flipbook');
+  const [viewMode, setViewMode] = useState<'flipbook' | 'scroll'>('scroll');
   const [spreadMode, setSpreadMode] = useState<'single' | 'double'>('double');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
@@ -287,10 +287,11 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({ book, pdfDocumen
           style={{
             WebkitOverflowScrolling: 'touch',
             touchAction: 'pan-y',
+            overscrollBehaviorY: 'contain',
           }}
-          className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden pt-16 pb-20 px-1 sm:px-4 flex justify-center"
+          className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden pt-16 pb-24 px-2 sm:px-4 flex justify-center"
         >
-          <div className="w-full flex flex-col items-center mx-auto my-2 sm:my-4 max-w-full sm:max-w-fit shadow-2xl rounded-lg sm:rounded-xl overflow-hidden border border-slate-800/80 bg-white">
+          <div className="w-full flex flex-col items-center mx-auto py-2 sm:py-4 max-w-5xl space-y-4 sm:space-y-6">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
               <PdfScrollPage
                 key={pageNum}

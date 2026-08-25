@@ -59,11 +59,12 @@ export const PdfScrollPage: React.FC<PdfScrollPageProps> = ({
       id={`page-container-${pageNumber}`}
       ref={containerRef}
       style={{
-        width: `${targetWidth}px`,
-        minHeight: `${targetHeight}px`,
+        maxWidth: '100%',
+        width: targetWidth > 0 ? `${targetWidth}px` : '100%',
+        minHeight: targetHeight > 0 ? `${targetHeight}px` : '400px',
         touchAction: 'pan-y',
       }}
-      className="relative my-0 mx-auto rounded-none overflow-hidden bg-white shadow-lg border-b border-slate-200/40 last:border-b-0"
+      className="relative my-2 sm:my-3 mx-auto rounded-lg sm:rounded-xl overflow-hidden bg-white shadow-2xl border border-slate-800/80 transition-shadow duration-300 hover:shadow-cyan-950/20"
     >
       {isInViewport ? (
         <PdfPageCanvas
@@ -76,9 +77,14 @@ export const PdfScrollPage: React.FC<PdfScrollPageProps> = ({
       ) : (
         /* Placeholder to maintain scroll height and prevent layout shift */
         <div
-          style={{ width: `${targetWidth}px`, height: `${targetHeight}px` }}
-          className="bg-white"
-        />
+          style={{
+            width: targetWidth > 0 ? `${targetWidth}px` : '100%',
+            height: targetHeight > 0 ? `${targetHeight}px` : '400px',
+          }}
+          className="bg-slate-900 flex items-center justify-center text-slate-600 text-xs font-mono"
+        >
+          Page {pageNumber}
+        </div>
       )}
     </div>
   );
