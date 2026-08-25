@@ -69,7 +69,8 @@ export const PdfPageCanvas: React.FC<PdfPageCanvasProps> = ({
         canvas.width = Math.floor(viewport.width);
         canvas.height = Math.floor(viewport.height);
         canvas.style.width = `${Math.floor(displayViewport.width)}px`;
-        canvas.style.height = `${Math.floor(displayViewport.height)}px`;
+        canvas.style.maxWidth = '100%';
+        canvas.style.height = 'auto';
 
         const renderContext = {
           canvasContext: context,
@@ -116,12 +117,12 @@ export const PdfPageCanvas: React.FC<PdfPageCanvasProps> = ({
 
   return (
     <div
-      className={`relative inline-block overflow-hidden bg-white touch-pan-y ${getSideShadowClass()} ${className}`}
+      className={`relative max-w-full overflow-hidden bg-white touch-pan-y flex justify-center items-center ${getSideShadowClass()} ${className}`}
       style={{ touchAction: 'pan-y' }}
     >
       <canvas
         ref={canvasRef}
-        className="block transition-opacity duration-200 pointer-events-none"
+        className="block max-w-full h-auto transition-opacity duration-200 pointer-events-none"
         style={{ touchAction: 'pan-y' }}
       />
 
